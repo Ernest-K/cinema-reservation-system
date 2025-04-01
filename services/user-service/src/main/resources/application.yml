@@ -1,0 +1,14 @@
+spring:
+  application:
+    name: user-service
+  datasource:
+    url: jdbc:postgresql://postgres:5432/cinema_reservation_db
+    username: admin
+    password: admin
+    jpa:
+      properties:
+        hibernate:
+          default_schema: user_service
+          dialect: org.hibernate.dialect.PostgreSQLDialect
+      hibernate:
+        ddl-auto: update

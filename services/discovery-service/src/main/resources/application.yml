@@ -1,0 +1,9 @@
+server:
+  port: 8761  # Port Eureka Server
+
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    registerWithEureka: false  # Eureka Server nie rejestruje si? sam w sobie
+    fetchRegistry: false       # Nie pobiera rejestru us?ug
