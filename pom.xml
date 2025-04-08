@@ -10,6 +10,7 @@
     <packaging>pom</packaging>
 
     <modules>
+        <module>services/api-gateway</module>
         <module>services/discovery-service</module>
         <module>services/movie-service</module>
         <module>services/user-service</module>
