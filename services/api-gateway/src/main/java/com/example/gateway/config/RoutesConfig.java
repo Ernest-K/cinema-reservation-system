@@ -18,6 +18,12 @@ public class RoutesConfig {
                 .path("/movie-service/actuator/**")
                 .filters(f -> f.rewritePath("/movie-service/actuator/(?<segment>.*)", "/actuator/${segment}"))
                 .uri("lb://movie-service"))
+            .route("reservation-service", r -> r
+                .path("/api/reservations/**")
+                .uri("lb://reservation-service"))
+            .route("payment-service", r -> r
+                 .path("/api/payments/**")
+                 .uri("lb://payment-service"))
             .build();
     }
 }

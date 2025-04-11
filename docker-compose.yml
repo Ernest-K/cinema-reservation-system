@@ -49,6 +49,24 @@ services:
       - "8082:8082"
     depends_on:
       - discovery-service
+      -
+  payment-service:
+    build:
+      context: services/payment-service
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    depends_on:
+      - discovery-service
+
+  reservation-service:
+    build:
+      context: services/reservation-service
+      dockerfile: Dockerfile
+    ports:
+      - "8083:8083"
+    depends_on:
+      - discovery-service
 
 volumes:
   postgres-data:
