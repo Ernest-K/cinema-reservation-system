@@ -8,31 +8,26 @@ import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
-import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
 @Entity
 @Table(name = "movies")
 public class Movie {
+
+    public Movie(String title, int releaseYear) {
+        this.title = title;
+        this.releaseYear = releaseYear;
+    }
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     private String title;
     private int releaseYear;
-
-    public Long getId() {
-        return id;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public int getReleaseYear() {
-        return releaseYear;
-    }
 
     @Override
     public String toString() {
