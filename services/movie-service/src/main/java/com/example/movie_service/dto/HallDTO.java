@@ -7,9 +7,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class MovieResponse {
+public class HallDTO {
     private Long id;
-    private String title;
-    private int releaseYear;
-    private double rating;
+    private int number;
+    private int rows;
+    private int seatsPerRow;
 }

@@ -1,7 +1,7 @@
 package com.example.movie_service.service;
 
-import com.example.movie_service.dto.MovieResponse;
-import com.example.movie_service.dto.RatingResponse;
+import com.example.movie_service.dto.MovieRatingDTO;
+import com.example.movie_service.dto.RatingDTO;
 import com.example.movie_service.entity.Movie;
 import com.example.movie_service.repository.MovieRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,24 +32,24 @@ public class MovieService {
         this.restTemplate = restTemplate;
     }
 
-    public List<MovieResponse> getAllMoviesWithRatings() {
+    public List<MovieRatingDTO> getAllMoviesWithRatings() {
         List<Movie> movies = movieRepository.findAll();
         return enrichWithRatings(movies);
     }
 
-    public List<MovieResponse> getMoviesByTitleWithRatings(String title) {
+    public List<MovieRatingDTO> getMoviesByTitleWithRatings(String title) {
         List<Movie> movies = movieRepository.findByTitleContainingIgnoreCase(title);
         return enrichWithRatings(movies);
     }
 
-    private List<MovieResponse> enrichWithRatings(List<Movie> movies) {
+    private List<MovieRatingDTO> enrichWithRatings(List<Movie> movies) {
         return movies.stream()
                 .map(this::mapToMovieResponseWithRating)
                 .collect(Collectors.toList());
     }
 
-    private MovieResponse mapToMovieResponseWithRating(Movie movie) {
-        return new MovieResponse(
+    private MovieRatingDTO mapToMovieResponseWithRating(Movie movie) {
+        return new MovieRatingDTO(
                 movie.getId(),
                 movie.getTitle(),
                 movie.getReleaseYear(),
@@ -61,10 +61,10 @@ public class MovieService {
         try {
             String encodedTitle = URLEncoder.encode(title, StandardCharsets.UTF_8);
             String url = ratingsApiUrl + "?apikey=" + ratingsApiKey + "&t=" + encodedTitle;
-            ResponseEntity<RatingResponse> responseEntity = restTemplate.getForEntity(url, RatingResponse.class);
+            ResponseEntity<RatingDTO> responseEntity = restTemplate.getForEntity(url, RatingDTO.class);
 
             if (responseEntity.getStatusCode() == HttpStatus.OK) {
-                RatingResponse response = responseEntity.getBody();
+                RatingDTO response = responseEntity.getBody();
                 return response != null ? parseRating(response.getImdbRating()) : 0.0;
             } else {
                 return 0.0;

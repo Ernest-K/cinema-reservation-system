@@ -10,7 +10,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class RatingResponse {
+public class RatingDTO {
     @JsonProperty("Title")
     private String title;
 
