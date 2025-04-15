@@ -5,6 +5,7 @@ import com.example.reservation_service.dto.*;
 import com.example.reservation_service.entity.Reservation;
 import com.example.reservation_service.entity.ReservationStatus;
 import com.example.reservation_service.entity.ReservedSeat;
+import com.example.reservation_service.kafka.producer.MessageProducer;
 import com.example.reservation_service.repository.ReservationRepository;
 import com.example.reservation_service.repository.ReservedSeatRepository;
 import jakarta.transaction.Transactional;
@@ -23,6 +24,7 @@ public class ReservationService {
     private final ReservationRepository reservationRepository;
     private final ReservedSeatRepository reservedSeatRepository;
     private final MovieServiceClient movieServiceClient;
+    private final MessageProducer messageProducer;
 
     public List<SeatDTO> getReservedSeatsByScreeningId(Long screeningId) {
         return reservedSeatRepository.findByReservation_ScreeningId(screeningId).stream().map(this::mapToSeatDTO).collect(Collectors.toList());
@@ -42,11 +44,9 @@ public class ReservationService {
     public ReservationDTO createReservation(CreateReservationDTO request) {
         ScreeningDTO screening = movieServiceClient.getScreeningById(request.getScreeningId());
 
-        List<SeatAvailabilityDTO> availabilityList = checkSeatsAvailability(
-                request.getScreeningId(), request.getSeatIds());
+        List<SeatAvailabilityDTO> availabilityList = checkSeatsAvailability(request.getScreeningId(), request.getSeatIds());
 
-        boolean allSeatsAvailable = availabilityList.stream()
-                .allMatch(SeatAvailabilityDTO::isAvailable);
+        boolean allSeatsAvailable = availabilityList.stream().allMatch(SeatAvailabilityDTO::isAvailable);
 
         if (!allSeatsAvailable) {
             throw new RuntimeException("Selected seats are not available");
@@ -74,7 +74,11 @@ public class ReservationService {
 
         Reservation savedReservation = reservationRepository.save(reservation);
 
-        return mapToReservationDTO(savedReservation, screening, seats);
+        ReservationDTO event = mapToReservationDTO(savedReservation, screening, seats);
+
+        messageProducer.send(event);
+
+        return event;
     }
 
     public ReservationDTO getReservation(Long reservationId) {
