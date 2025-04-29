@@ -31,7 +31,7 @@ public class Reservation {
 
     private BigDecimal totalAmount;
 
-    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @JoinColumn(name = "reservation_id")
     private List<ReservedSeat> seats = new ArrayList<>();
 }

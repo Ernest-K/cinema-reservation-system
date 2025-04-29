@@ -94,6 +94,20 @@ public class ReservationService {
         return mapToReservationDTO(reservation, screening, seats);
     }
 
+    public void updateReservationStatus(PaymentStatusDTO paymentStatusDTO) {
+        Reservation reservation = reservationRepository.findById(paymentStatusDTO.getReservationId())
+                .orElseThrow(() -> new NotFoundException("Reservation not found"));
+
+        if ("completed".equals(paymentStatusDTO.getStatus())) {
+            reservation.setStatus(ReservationStatus.CONFIRMED);
+        } else {
+            reservation.getSeats().clear();
+            reservation.setStatus(ReservationStatus.EXPIRED);
+        }
+
+        reservationRepository.save(reservation);
+    }
+
     private SeatDTO mapToSeatDTO(ReservedSeat reservedSeat) {
         return new SeatDTO(reservedSeat.getSeatId(), reservedSeat.getRowNumber(), reservedSeat.getSeatNumber());
     }

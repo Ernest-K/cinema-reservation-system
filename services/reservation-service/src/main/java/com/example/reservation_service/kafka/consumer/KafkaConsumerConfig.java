@@ -1,6 +1,6 @@
 package com.example.reservation_service.kafka.consumer;
 
-import com.example.reservation_service.dto.ReservationDTO;
+import com.example.reservation_service.dto.PaymentStatusDTO;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;
@@ -17,7 +17,7 @@ import java.util.Map;
 public class KafkaConsumerConfig {
 
     @Bean
-    public ConsumerFactory<String, ReservationDTO> consumerFactory() {
+    public ConsumerFactory<String, PaymentStatusDTO> consumerFactory() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, "localhost:9092");
         configProps.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group");
@@ -26,12 +26,12 @@ public class KafkaConsumerConfig {
         configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "com.example.reservation_service.dto");
         return new DefaultKafkaConsumerFactory<>(configProps,
                 new StringDeserializer(),
-                new JsonDeserializer<>(ReservationDTO.class, false));
+                new JsonDeserializer<>(PaymentStatusDTO.class, false));
     }
 
     @Bean
-    public ConcurrentKafkaListenerContainerFactory<String, ReservationDTO> kafkaListenerContainerFactory() {
-        ConcurrentKafkaListenerContainerFactory<String, ReservationDTO> factory = new ConcurrentKafkaListenerContainerFactory<>();
+    public ConcurrentKafkaListenerContainerFactory<String, PaymentStatusDTO> kafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, PaymentStatusDTO> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(consumerFactory());
         return factory;
     }
