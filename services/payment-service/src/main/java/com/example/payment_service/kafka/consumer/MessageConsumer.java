@@ -3,6 +3,8 @@ package com.example.payment_service.kafka.consumer;
 import com.example.payment_service.dto.ReservationDTO;
 import com.example.payment_service.dto.TransactionRequest;
 import com.example.payment_service.dto.TransactionResponse;
+import com.example.payment_service.entity.Payment;
+import com.example.payment_service.repository.PaymentRepository;
 import com.example.payment_service.service.PaymentService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -10,11 +12,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 @RequiredArgsConstructor
 public class MessageConsumer {
 
     private final PaymentService paymentService;
+    private final PaymentRepository paymentRepository;
     private static final Logger LOG = LoggerFactory.getLogger(MessageConsumer.class);
 
     @KafkaListener(topics = "cinema.reservation", groupId = "cinema-group")
@@ -28,19 +33,18 @@ public class MessageConsumer {
         payer.setName(reservation.getCustomerName());
         request.setPayer(payer);
         TransactionRequest.Pay pay = new TransactionRequest.Pay();
-        pay.setGroupId(150); // Można przenieść do konfiguracji
+        pay.setGroupId(150);
         request.setPay(pay);
 
         TransactionResponse response = paymentService.createTransaction(request);
 
-        System.out.println(response.toString());
+        Payment payment = new Payment();
+        payment.setTransactionId(response.getTransactionId());
+        payment.setReservationId(reservation.getId());
+        payment.setCreationDate(LocalDateTime.now());
+        payment.setExpirationDate(LocalDateTime.now().plusMinutes(1));
+        payment.setStatus("pending");
 
-//        PaymentTransaction transaction = new PaymentTransaction();
-//        transaction.setTransactionId(response.getTransactionId());
-//        transaction.setReservationId(reservation.getId());
-//        transaction.setCreationDate(LocalDateTime.now());
-//        transaction.setExpirationDate(LocalDateTime.now().plusMinutes(15));
-//        transaction.setStatus("pending");
-//        repository.save(transaction);
+        paymentRepository.save(payment);
     }
 }

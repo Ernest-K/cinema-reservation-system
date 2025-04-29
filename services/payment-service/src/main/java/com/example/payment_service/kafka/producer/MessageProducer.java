@@ -11,6 +11,7 @@ public class MessageProducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(MessageProducer.class);
     private static final String TOPIC = "cinema.reservation";
+    private static final String PAYMENT_STATUS_TOPIC = "cinema.payment.status";
     private final KafkaTemplate<String, ReservationDTO> kafkaTemplate;
 
     public MessageProducer(KafkaTemplate<String, ReservationDTO> kafkaTemplate) {
