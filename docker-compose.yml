@@ -74,3 +74,5 @@ services:
 
 volumes:
   postgres-data:
+
+# docker compose up zookeeper kafka

@@ -1,0 +1,158 @@
+components:
+  schemas:
+    CreateReservationDTO:
+      type: object
+      properties:
+        movieId:
+          type: integer
+          format: int64
+        screeningId:
+          type: integer
+          format: int64
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        seatIds:
+          type: array
+          items:
+            type: integer
+            format: int64
+
+    HallDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+
+    MovieDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        title:
+          type: string
+
+    SeatDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        rowNumber:
+          type: integer
+        seatNumber:
+          type: integer
+
+    SeatAvailabilityDTO:
+      type: object
+      properties:
+        seatId:
+          type: integer
+          format: int64
+        available:
+          type: boolean
+
+    ScreeningDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        startTime:
+          type: string
+          format: date-time
+        basePrice:
+          type: number
+          format: double
+        movieDTO:
+          $ref: '#/components/schemas/MovieDTO'
+        hallDTO:
+          $ref: '#/components/schemas/HallDTO'
+
+    ReservationDTO:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        screeningDTO:
+          $ref: '#/components/schemas/ScreeningDTO'
+        customerName:
+          type: string
+        customerEmail:
+          type: string
+        reservationTime:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum: [PENDING, CONFIRMED, CANCELLED] # <- Dopasuj do Enumu w kodzie
+        totalAmount:
+          type: number
+          format: double
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatDTO'
+
+    TpayAuthResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+        token_type:
+          type: string
+        expires_in:
+          type: integer
+
+    TransactionRequest:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: double
+        description:
+          type: string
+        payer:
+          type: object
+          properties:
+            email:
+              type: string
+            name:
+              type: string
+        pay:
+          type: object
+          properties:
+            groupId:
+              type: integer
+
+    TransactionResponse:
+      type: object
+      properties:
+        result:
+          type: string
+        transactionId:
+          type: string
+        status:
+          type: string
+        transactionPaymentUrl:
+          type: string
+        creationDate:
+          type: string
+          format: date-time
+
+    TransactionStatusResponse:
+      type: object
+      properties:
+        result:
+          type: string
+        status:
+          type: string
+        realizationDate:
+          type: string
+          format: date-time
