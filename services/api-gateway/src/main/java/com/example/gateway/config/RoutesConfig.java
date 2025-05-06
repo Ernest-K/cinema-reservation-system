@@ -17,6 +17,9 @@ public class RoutesConfig {
             .route("reservation-service", r -> r
                     .path("/api/reservations/**")
                     .uri("lb://reservation-service"))
+            .route("ticket-service", r -> r
+                    .path("/api/tickets/**")
+                    .uri("lb://ticket-service"))
             .route("payment-service", r -> r
                     .path("/api/payments/**")
                     .uri("lb://payment-service"))

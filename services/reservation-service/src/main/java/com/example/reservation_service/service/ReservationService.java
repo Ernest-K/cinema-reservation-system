@@ -76,7 +76,7 @@ public class ReservationService {
 
         ReservationDTO event = mapToReservationDTO(savedReservation, screening, seats);
 
-        messageProducer.send(event);
+        messageProducer.sendReservation(event);
 
         return event;
     }
@@ -100,6 +100,7 @@ public class ReservationService {
 
         if ("completed".equals(paymentStatusDTO.getStatus())) {
             reservation.setStatus(ReservationStatus.CONFIRMED);
+            ticketGenerationRequest(reservation);
         } else {
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.EXPIRED);
@@ -123,5 +124,13 @@ public class ReservationService {
                 reservation.getTotalAmount(),
                 seats
         );
+    }
+
+    public void ticketGenerationRequest(Reservation reservation) {
+        ReservationDTO reservationDTO = mapToReservationDTO(reservation, movieServiceClient.getScreeningById(reservation.getScreeningId()), reservation.getSeats().stream()
+                .map(this::mapToSeatDTO)
+                .collect(Collectors.toList()));
+
+        messageProducer.sendTicketRequest(reservationDTO);
     }
 }
