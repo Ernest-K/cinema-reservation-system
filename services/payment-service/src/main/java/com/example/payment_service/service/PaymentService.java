@@ -30,6 +30,9 @@ public class PaymentService {
     @Value("${tpay.api.transaction.url}")
     private String transactionUrl;
 
+    @Value("${tpay.transaction.mock.enabled}")
+    private boolean mockEnabled;
+
     public PaymentService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
@@ -78,6 +81,13 @@ public class PaymentService {
     }
 
     public TransactionStatusResponse getTransactionStatus(String transactionId) {
+
+        if(mockEnabled) {
+            TransactionStatusResponse transactionStatusResponse = new TransactionStatusResponse();
+            transactionStatusResponse.setStatus("correct");
+            return transactionStatusResponse;
+        }
+
         String token = getAccessToken();
 
         HttpHeaders headers = new HttpHeaders();
