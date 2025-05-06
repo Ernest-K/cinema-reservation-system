@@ -94,6 +94,7 @@ public class ReservationService {
         return mapToReservationDTO(reservation, screening, seats);
     }
 
+    @Transactional
     public void updateReservationStatus(PaymentStatusDTO paymentStatusDTO) {
         Reservation reservation = reservationRepository.findById(paymentStatusDTO.getReservationId())
                 .orElseThrow(() -> new NotFoundException("Reservation not found"));
@@ -105,6 +106,17 @@ public class ReservationService {
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.EXPIRED);
         }
+
+        reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public void cancelReservation(Long reservationId) {
+        Reservation reservation = reservationRepository.findById(reservationId)
+                .orElseThrow(() -> new NotFoundException("Reservation not found"));
+
+        reservation.getSeats().clear();
+        reservation.setStatus(ReservationStatus.CANCELLED);
 
         reservationRepository.save(reservation);
     }

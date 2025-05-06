@@ -6,7 +6,6 @@ import com.example.payment_service.kafka.producer.MessageProducer;
 import com.example.payment_service.repository.PaymentRepository;
 import com.example.payment_service.service.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -24,11 +23,11 @@ public class TransactionScheduler {
     @Scheduled(fixedRate = 5000)
     public void checkTransactions() {
         paymentRepository.findByStatus("pending").forEach(payment -> {
-            TransactionStatusResponse transactionStatusResponsea = paymentService.getTransactionStatus(payment.getTransactionId());
+            TransactionStatusResponse transactionStatusResponse = paymentService.getTransactionStatus(payment.getTransactionId());
 
             System.out.println("scheduling");
 
-            if ("correct".equals(transactionStatusResponsea.getStatus())) {
+            if ("correct".equals(transactionStatusResponse.getStatus())) {
                 payment.setStatus("completed");
                 System.out.println("completed");
                 PaymentStatusDTO paymentStatusDTO = new PaymentStatusDTO(payment.getId(), payment.getReservationId(), payment.getStatus());
