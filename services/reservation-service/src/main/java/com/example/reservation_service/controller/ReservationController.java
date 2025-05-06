@@ -31,4 +31,10 @@ public class ReservationController {
     public ReservationDTO getReservation(@PathVariable("id") Long id) {
         return reservationService.getReservation(id);
     }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cancelReservation(@PathVariable("id") Long id) {
+        reservationService.cancelReservation(id);
+    }
 }
