@@ -1,58 +1,45 @@
 package com.example.ticket_service.entity;
 
+import jakarta.persistence.*;
+import lombok.*;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+@Entity
+@Table(name = "tickets")
 public class Ticket {
-//    private Long id;
-//    private Long reservationId;
-//    private String seatNumber;
-//    private String status; // PENDING_PAYMENT, CONFIRMED, CANCELLED, EXPIRED
-//    private String movieTitle;
-//    private String showTime;
-//
-//    public Long getId() {
-//        return id;
-//    }
-//
-//    public void setId(Long id) {
-//        this.id = id;
-//    }
-//
-//    public Long getReservationId() {
-//        return reservationId;
-//    }
-//
-//    public void setReservationId(Long reservationId) {
-//        this.reservationId = reservationId;
-//    }
-//
-//    public String getSeatNumber() {
-//        return seatNumber;
-//    }
-//
-//    public void setSeatNumber(String seatNumber) {
-//        this.seatNumber = seatNumber;
-//    }
-//
-//    public String getStatus() {
-//        return status;
-//    }
-//
-//    public void setStatus(String status) {
-//        this.status = status;
-//    }
-//
-//    public String getMovieTitle() {
-//        return movieTitle;
-//    }
-//
-//    public void setMovieTitle(String movieTitle) {
-//        this.movieTitle = movieTitle;
-//    }
-//
-//    public String getShowTime() {
-//        return showTime;
-//    }
-//
-//    public void setShowTime(String showTime) {
-//        this.showTime = showTime;
-//    }
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    private Long reservationId;
+    private Long screeningId;
+
+    private String movieTitle; // Denormalizowane dla łatwiejszego dostępu
+    private LocalDateTime screeningStartTime; // Denormalizowane
+
+    private Long hallId;
+    private int hallNumber; // Denormalizowane
+
+    private Long seatId;
+    private int seatRow;
+    private int seatNumber;
+
+    private String customerName;
+    private String customerEmail;
+
+    private BigDecimal price;
+    private String seatsDescription;
+
+    @Lob
+    private String qrCodeData;
+
+    private LocalDateTime validatedAt;
+    private LocalDateTime createdAt;
 }
