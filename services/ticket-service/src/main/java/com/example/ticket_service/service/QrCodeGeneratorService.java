@@ -51,7 +51,7 @@ public class QrCodeGeneratorService {
      * Opcjonalnie: Generuje obraz QR kodu jako tablicę bajtów (PNG).
      * Ta metoda może nie być potrzebna, jeśli przechowujemy tylko tekst QR w bazie.
      */
-    public byte[] generateQrCodeImage(Long ticketId, String text, int width, int height) throws WriterException, IOException {
+    public byte[] generateQrCodeImage(String text, int width, int height) throws WriterException, IOException {
         QRCodeWriter qrCodeWriter = new QRCodeWriter();
         Map<EncodeHintType, Object> hints = new HashMap<>();
         hints.put(EncodeHintType.CHARACTER_SET, "UTF-8");
@@ -59,13 +59,6 @@ public class QrCodeGeneratorService {
 
         BitMatrix bitMatrix = qrCodeWriter.encode(text, BarcodeFormat.QR_CODE, width, height, hints);
 
-        Path filePath = Paths.get(".", "/qr" + ticketId.toString() + ".png").toAbsolutePath().normalize();
-
-        // Zapis obrazka do pliku
-        MatrixToImageWriter.writeToPath(bitMatrix, "PNG", filePath);
-        System.out.println("QR Code saved to: " + filePath.toString());
-
-        // --- Zwracanie jako ByteArrayOutputStream (jeśli nadal potrzebne) ---
         ByteArrayOutputStream pngOutputStream = new ByteArrayOutputStream();
         MatrixToImageWriter.writeToStream(bitMatrix, "PNG", pngOutputStream);
         return pngOutputStream.toByteArray();

@@ -93,8 +93,6 @@ public class TicketService {
         LOG.info("Successfully generated and saved a single ticket (UID: {}) for reservation ID: {}",
                 savedTicket.getId(), reservationDTO.getId());
 
-        qrCodeGeneratorService.generateQrCodeImage(savedTicket.getId(), qrCodeText, 500, 500);
-
         return savedTicket;
     }
 
@@ -120,6 +118,26 @@ public class TicketService {
 
         LOG.info("Ticket with ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
         return mapToTicketDTO(validatedTicket);
+    }
+
+    @Transactional(readOnly = true) // Tylko odczyt z bazy
+    public byte[] getQrCodeImageForTicket(Long ticketId) throws IOException, WriterException {
+        LOG.debug("Requesting QR code image for ticket ID: {}", ticketId);
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> {
+                    LOG.warn("Ticket not found when requesting QR code image for ID: {}", ticketId);
+                    return new NotFoundException("Ticket with ID " + ticketId + " not found.");
+                });
+
+        if (ticket.getQrCodeData() == null || ticket.getQrCodeData().isEmpty()) {
+            LOG.error("QR code data is missing for ticket ID: {}", ticketId);
+            // Można rzucić inny, specyficzny wyjątek lub zwrócić domyślny obrazek błędu
+            throw new IllegalStateException("QR code data is missing for ticket " + ticketId);
+        }
+
+        // Generuj obrazek QR używając danych z biletu
+        return qrCodeGeneratorService.generateQrCodeImage(ticket.getQrCodeData(), 500, 500);
     }
 
     public TicketDTO getTicketById(Long ticketId) {

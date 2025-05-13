@@ -149,7 +149,7 @@
 						"header": [],
 						"body": {
 							"mode": "raw",
-							"raw": "{\r\n    \"movieId\": 1,\r\n    \"screeningId\": 1,\r\n    \"customerName\": \"John\",\r\n    \"customerEmail\": \"john@gmail.com\",\r\n    \"seatIds\": [2]\r\n}",
+							"raw": "{\r\n    \"movieId\": 1,\r\n    \"screeningId\": 1,\r\n    \"customerName\": \"John\",\r\n    \"customerEmail\": \"john@gmail.com\",\r\n    \"seatIds\": [12]\r\n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -247,7 +247,7 @@
 						"method": "GET",
 						"header": [],
 						"url": {
-							"raw": "localhost:8080/api/tickets/reservation/2",
+							"raw": "localhost:8080/api/tickets/reservation/5",
 							"host": [
 								"localhost"
 							],
@@ -256,7 +256,7 @@
 								"api",
 								"tickets",
 								"reservation",
-								"2"
+								"5"
 							]
 						}
 					},
@@ -277,6 +277,47 @@
 								"api",
 								"tickets",
 								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "get ticket qr code",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/api/tickets/1",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"tickets",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "validate ticket",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "localhost:8080/api/tickets/1/validate",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"tickets",
+								"1",
+								"validate"
 							]
 						}
 					},
