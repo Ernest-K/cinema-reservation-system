@@ -11,6 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class QrCodePayload {
+    private Long ticketId;
     private Long reservationId;
     private String movieTitle;
     private LocalDateTime screeningTime;

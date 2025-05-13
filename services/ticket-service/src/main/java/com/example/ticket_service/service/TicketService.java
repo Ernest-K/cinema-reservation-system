@@ -6,6 +6,7 @@ import com.example.ticket_service.dto.ScreeningDTO;
 import com.example.ticket_service.dto.TicketDTO;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.repository.TicketRepository;
+import com.google.zxing.WriterException;
 import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
@@ -13,10 +14,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -29,7 +30,7 @@ public class TicketService {
     private final QrCodeGeneratorService qrCodeGeneratorService;
 
     @Transactional
-    public Ticket generateAndSaveTicketForReservation(ReservationDTO reservationDTO) {
+    public Ticket generateAndSaveTicketForReservation(ReservationDTO reservationDTO) throws IOException, WriterException {
         LOG.info("Attempting to generate a single ticket for reservation ID: {}", reservationDTO.getId());
 
         // Sprawdzenie, czy bilet dla tej rezerwacji już istnieje (dzięki unique constraint na reservationId)
@@ -46,30 +47,11 @@ public class TicketService {
         }
 
         ScreeningDTO screening = reservationDTO.getScreeningDTO();
-        String ticketUid = UUID.randomUUID().toString();
-
-        // Przygotowanie listy informacji o miejscach dla QR kodu
-        List<String> seatsInfoListForQr = reservationDTO.getSeats().stream()
-                .map(seat -> "Row " + seat.getRowNumber() + ", Seat " + seat.getSeatNumber())
-                .collect(Collectors.toList());
 
         // Przygotowanie opisu miejsc do zapisu w encji (dla łatwiejszego odczytu)
         String seatsDescriptionAggregated = reservationDTO.getSeats().stream()
-                .map(seat -> "R" + seat.getRowNumber() + "M" + seat.getSeatNumber())
+                .map(seat -> "R" + seat.getRowNumber() + "S" + seat.getSeatNumber())
                 .collect(Collectors.joining(", "));
-
-
-        // Przygotowanie danych do kodu QR
-        QrCodePayload qrPayload = new QrCodePayload(
-                reservationDTO.getId(),
-                screening.getMovieDTO().getTitle(),
-                screening.getStartTime(),
-                "Hall " + screening.getHallDTO().getNumber(),
-                seatsInfoListForQr, // Przekazujemy listę informacji o miejscach
-                reservationDTO.getCustomerName(),
-                reservationDTO.getSeats().size() // Liczba miejsc
-        );
-        String qrCodeText = qrCodeGeneratorService.generateQrCodeText(qrPayload);
 
         Ticket ticket = Ticket.builder()
                 .reservationId(reservationDTO.getId())
@@ -81,15 +63,63 @@ public class TicketService {
                 .customerName(reservationDTO.getCustomerName())
                 .customerEmail(reservationDTO.getCustomerEmail())
                 .price(reservationDTO.getTotalAmount())
-                .qrCodeData(qrCodeText)
+                .qrCodeData("")
                 .seatsDescription(seatsDescriptionAggregated)
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        Ticket savedTicket = ticketRepository.save(ticket);
+        Ticket savedTicketWithId = ticketRepository.saveAndFlush(ticket);
+
+        List<String> seatsInfoListForQr = reservationDTO.getSeats().stream()
+                .map(seat -> "Row " + seat.getRowNumber() + ", Seat " + seat.getSeatNumber())
+                .collect(Collectors.toList());
+
+        // Przygotowanie danych do kodu QR
+        QrCodePayload qrPayload = new QrCodePayload(
+                savedTicketWithId.getId(),
+                reservationDTO.getId(),
+                screening.getMovieDTO().getTitle(),
+                screening.getStartTime(),
+                "Hall " + screening.getHallDTO().getNumber(),
+                seatsInfoListForQr,
+                reservationDTO.getCustomerName(),
+                reservationDTO.getSeats().size()
+        );
+        String qrCodeText = qrCodeGeneratorService.generateQrCodeText(qrPayload);
+
+        savedTicketWithId.setQrCodeData(qrCodeText);
+        Ticket savedTicket = ticketRepository.save(savedTicketWithId);
+
         LOG.info("Successfully generated and saved a single ticket (UID: {}) for reservation ID: {}",
                 savedTicket.getId(), reservationDTO.getId());
+
+        qrCodeGeneratorService.generateQrCodeImage(savedTicket.getId(), qrCodeText, 500, 500);
+
         return savedTicket;
+    }
+
+    @Transactional
+    public TicketDTO validateTicket(Long ticketId) {
+        LOG.info("Attempting to validate ticket with ID: {}", ticketId);
+
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> {
+                    LOG.warn("Ticket not found for validation with ID: {}", ticketId);
+                    return new NotFoundException("Ticket with ID " + ticketId + " not found.");
+                });
+
+        if (ticket.getValidatedAt() != null) {
+            LOG.warn("Ticket with ID: {} has already been validated at {}.", ticketId, ticket.getValidatedAt());
+            throw new NotFoundException(
+                    "Ticket with ID " + ticketId + " was already validated at " + ticket.getValidatedAt()
+            );
+        }
+
+        ticket.setValidatedAt(LocalDateTime.now());
+        Ticket validatedTicket = ticketRepository.save(ticket);
+
+        LOG.info("Ticket with ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
+        return mapToTicketDTO(validatedTicket);
     }
 
     public TicketDTO getTicketById(Long ticketId) {

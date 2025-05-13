@@ -3,10 +3,7 @@ package com.example.ticket_service.controller;
 import com.example.ticket_service.dto.TicketDTO;
 import com.example.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 
 @RestController
@@ -23,5 +20,10 @@ public class TicketController {
     @GetMapping("/{ticketId}")
     public TicketDTO getTicketByUid(@PathVariable("ticketId") Long ticketId) {
         return ticketService.getTicketById(ticketId);
+    }
+
+    @PostMapping("/{ticketId}/validate")
+    public TicketDTO validateTicket(@PathVariable("ticketId") Long ticketId) {
+        return ticketService.validateTicket(ticketId);
     }
 }
