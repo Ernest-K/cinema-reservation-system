@@ -1,9 +1,6 @@
 package com.example.ticket_service.service;
 
-import com.example.ticket_service.dto.QrCodePayload;
-import com.example.ticket_service.dto.ReservationDTO;
-import com.example.ticket_service.dto.ScreeningDTO;
-import com.example.ticket_service.dto.TicketDTO;
+import org.example.commons.dto.*;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.repository.TicketRepository;
 import com.google.zxing.WriterException;
@@ -75,7 +72,7 @@ public class TicketService {
                 .collect(Collectors.toList());
 
         // Przygotowanie danych do kodu QR
-        QrCodePayload qrPayload = new QrCodePayload(
+        QrCodePayloadDTO qrPayload = new QrCodePayloadDTO(
                 savedTicketWithId.getId(),
                 reservationDTO.getId(),
                 screening.getMovieDTO().getTitle(),

@@ -1,6 +1,6 @@
 package com.example.reservation_service.kafka.producer;
 
-import com.example.reservation_service.dto.ReservationDTO;
+import org.example.commons.dto.ReservationDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;

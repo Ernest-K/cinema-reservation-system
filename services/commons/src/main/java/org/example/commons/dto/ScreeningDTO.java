@@ -1,8 +1,6 @@
-package com.example.payment_service.dto;
+package org.example.commons.dto;
 
 
-import com.example.payment_service.dto.HallDTO;
-import com.example.payment_service.dto.MovieDTO;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

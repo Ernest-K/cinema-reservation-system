@@ -1,6 +1,6 @@
 package com.example.payment_service.kafka.producer;
 
-import com.example.payment_service.dto.PaymentStatusDTO;
+import org.example.commons.dto.PaymentStatusDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;

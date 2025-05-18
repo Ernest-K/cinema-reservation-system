@@ -1,6 +1,6 @@
 package com.example.payment_service.kafka.consumer;
 
-import com.example.payment_service.dto.ReservationDTO;
+import org.example.commons.dto.ReservationDTO;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;

@@ -1,7 +1,6 @@
 package com.example.payment_service.kafka.producer;
 
-import com.example.payment_service.dto.PaymentStatusDTO;
-import com.example.payment_service.dto.ReservationDTO;
+import org.example.commons.dto.PaymentStatusDTO;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.context.annotation.Bean;

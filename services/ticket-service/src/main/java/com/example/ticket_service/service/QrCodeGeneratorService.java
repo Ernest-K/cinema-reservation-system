@@ -1,6 +1,6 @@
 package com.example.ticket_service.service;
 
-import com.example.ticket_service.dto.QrCodePayload;
+import org.example.commons.dto.QrCodePayloadDTO;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -17,8 +17,6 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -37,7 +35,7 @@ public class QrCodeGeneratorService {
     /**
      * Generuje tekstową reprezentację (JSON) danych dla kodu QR.
      */
-    public String generateQrCodeText(QrCodePayload payload) {
+    public String generateQrCodeText(QrCodePayloadDTO payload) {
         try {
             return objectMapper.writeValueAsString(payload);
         } catch (JsonProcessingException e) {

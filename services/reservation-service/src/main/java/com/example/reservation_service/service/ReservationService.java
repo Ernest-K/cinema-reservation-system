@@ -1,9 +1,7 @@
 package com.example.reservation_service.service;
 
 import com.example.reservation_service.client.MovieServiceClient;
-import com.example.reservation_service.dto.*;
 import com.example.reservation_service.entity.Reservation;
-import com.example.reservation_service.entity.ReservationStatus;
 import com.example.reservation_service.entity.ReservedSeat;
 import com.example.reservation_service.kafka.producer.MessageProducer;
 import com.example.reservation_service.repository.ReservationRepository;
@@ -11,6 +9,8 @@ import com.example.reservation_service.repository.ReservedSeatRepository;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.dto.*;
+import org.example.commons.enums.ReservationStatus;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;

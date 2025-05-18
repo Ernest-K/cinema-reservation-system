@@ -1,6 +1,6 @@
 package com.example.ticket_service.kafka.consumer;
 
-import com.example.ticket_service.dto.ReservationDTO;
+import org.example.commons.dto.*;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;

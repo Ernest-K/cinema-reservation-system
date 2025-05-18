@@ -1,6 +1,6 @@
 package com.example.ticket_service.kafka.consumer;
 
-import com.example.ticket_service.dto.ReservationDTO;
+import org.example.commons.dto.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.context.annotation.Bean;

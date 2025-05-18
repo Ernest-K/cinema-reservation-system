@@ -1,6 +1,6 @@
 package com.example.ticket_service.kafka.producer;
 
-import com.example.ticket_service.dto.TicketDTO;
+import org.example.commons.dto.*;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
 import org.springframework.context.annotation.Bean;

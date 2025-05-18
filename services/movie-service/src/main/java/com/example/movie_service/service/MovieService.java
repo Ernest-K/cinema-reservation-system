@@ -1,6 +1,6 @@
 package com.example.movie_service.service;
 
-import com.example.movie_service.dto.MovieRatingDTO;
+import org.example.commons.dto.MovieRatingDTO;
 import com.example.movie_service.dto.RatingDTO;
 import com.example.movie_service.entity.Movie;
 import com.example.movie_service.repository.MovieRepository;

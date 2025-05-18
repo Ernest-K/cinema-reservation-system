@@ -1,9 +1,6 @@
 package com.example.movie_service.service;
 
-import com.example.movie_service.dto.HallDTO;
-import com.example.movie_service.dto.MovieDTO;
-import com.example.movie_service.dto.ScreeningDTO;
-import com.example.movie_service.dto.SeatDTO;
+import org.example.commons.dto.*;
 import com.example.movie_service.entity.Hall;
 import com.example.movie_service.entity.Movie;
 import com.example.movie_service.entity.Screening;

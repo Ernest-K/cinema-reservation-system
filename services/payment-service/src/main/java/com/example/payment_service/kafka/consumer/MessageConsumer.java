@@ -1,6 +1,6 @@
 package com.example.payment_service.kafka.consumer;
 
-import com.example.payment_service.dto.ReservationDTO;
+import org.example.commons.dto.ReservationDTO;
 import com.example.payment_service.dto.TransactionRequest;
 import com.example.payment_service.dto.TransactionResponse;
 import com.example.payment_service.entity.Payment;

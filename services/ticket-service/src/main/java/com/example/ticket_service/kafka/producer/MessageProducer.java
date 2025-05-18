@@ -1,6 +1,6 @@
 package com.example.ticket_service.kafka.producer;
 
-import com.example.ticket_service.dto.TicketDTO;
+import org.example.commons.dto.TicketDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.core.KafkaTemplate;

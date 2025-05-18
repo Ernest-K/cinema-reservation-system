@@ -1,8 +1,6 @@
 package com.example.movie_service.controller;
 
-import com.example.movie_service.dto.MovieRatingDTO;
-import com.example.movie_service.dto.ScreeningDTO;
-import com.example.movie_service.dto.SeatDTO;
+import org.example.commons.dto.*;
 import com.example.movie_service.service.MovieService;
 import com.example.movie_service.service.ScreeningService;
 import lombok.RequiredArgsConstructor;

@@ -1,4 +1,4 @@
-package com.example.ticket_service.dto;
+package org.example.commons.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -10,7 +10,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class QrCodePayload {
+public class QrCodePayloadDTO {
     private Long ticketId;
     private Long reservationId;
     private String movieTitle;

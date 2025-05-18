@@ -1,7 +1,7 @@
 package com.example.reservation_service.kafka.consumer;
 
-import com.example.reservation_service.dto.PaymentStatusDTO;
 import com.example.reservation_service.service.ReservationService;
+import org.example.commons.dto.PaymentStatusDTO;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

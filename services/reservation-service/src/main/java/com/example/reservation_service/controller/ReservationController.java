@@ -1,12 +1,10 @@
 package com.example.reservation_service.controller;
 
-import com.example.reservation_service.dto.CreateReservationDTO;
-import com.example.reservation_service.dto.ReservationDTO;
-import com.example.reservation_service.dto.SeatDTO;
 import com.example.reservation_service.service.ReservationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
+import org.example.commons.dto.*;
 
 import java.util.List;
 

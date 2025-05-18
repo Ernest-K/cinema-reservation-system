@@ -1,4 +1,4 @@
-package com.example.payment_service.entity;
+package org.example.commons.enums;
 
 public enum ReservationStatus {
     PENDING_PAYMENT,  // Oczekuje na płatność

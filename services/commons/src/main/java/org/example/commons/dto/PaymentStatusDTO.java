@@ -1,4 +1,4 @@
-package com.example.reservation_service.dto;
+package org.example.commons.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;

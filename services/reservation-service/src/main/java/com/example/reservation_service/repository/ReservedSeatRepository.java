@@ -1,7 +1,7 @@
 package com.example.reservation_service.repository;
 
-import com.example.reservation_service.entity.ReservationStatus;
 import com.example.reservation_service.entity.ReservedSeat;
+import org.example.commons.enums.ReservationStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;

@@ -1,9 +1,9 @@
-package com.example.reservation_service.dto;
+package org.example.commons.dto;
 
-import com.example.reservation_service.entity.ReservationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.commons.enums.ReservationStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;

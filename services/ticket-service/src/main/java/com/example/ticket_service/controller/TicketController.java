@@ -1,6 +1,6 @@
 package com.example.ticket_service.controller;
 
-import com.example.ticket_service.dto.TicketDTO;
+import org.example.commons.dto.TicketDTO;
 import com.example.ticket_service.service.TicketService;
 import com.google.zxing.NotFoundException;
 import com.google.zxing.WriterException;

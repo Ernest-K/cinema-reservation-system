@@ -1,6 +1,6 @@
 package com.example.payment_service.scheduler;
 
-import com.example.payment_service.dto.PaymentStatusDTO;
+import org.example.commons.dto.PaymentStatusDTO;
 import com.example.payment_service.dto.TransactionStatusResponse;
 import com.example.payment_service.kafka.producer.MessageProducer;
 import com.example.payment_service.repository.PaymentRepository;
