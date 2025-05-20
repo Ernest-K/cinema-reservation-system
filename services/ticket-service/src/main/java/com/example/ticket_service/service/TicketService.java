@@ -1,5 +1,6 @@
 package com.example.ticket_service.service;
 
+import com.example.ticket_service.kafka.producer.MessageProducer;
 import org.example.commons.dto.*;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.repository.TicketRepository;
@@ -22,12 +23,12 @@ import java.util.stream.Collectors;
 public class TicketService {
 
     private static final Logger LOG = LoggerFactory.getLogger(TicketService.class);
-
+    private final MessageProducer producer;
     private final TicketRepository ticketRepository;
     private final QrCodeGeneratorService qrCodeGeneratorService;
 
     @Transactional
-    public Ticket generateAndSaveTicketForReservation(ReservationDTO reservationDTO) throws IOException, WriterException {
+    public Ticket generateAndSaveTicketForReservation(ReservationDTO reservationDTO) {
         LOG.info("Attempting to generate a single ticket for reservation ID: {}", reservationDTO.getId());
 
         // Sprawdzenie, czy bilet dla tej rezerwacji już istnieje (dzięki unique constraint na reservationId)
@@ -89,6 +90,8 @@ public class TicketService {
 
         LOG.info("Successfully generated and saved a single ticket (UID: {}) for reservation ID: {}",
                 savedTicket.getId(), reservationDTO.getId());
+
+        producer.send(mapToTicketDTO(savedTicket));
 
         return savedTicket;
     }

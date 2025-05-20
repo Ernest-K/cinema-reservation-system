@@ -2,7 +2,6 @@ package com.example.ticket_service.controller;
 
 import org.example.commons.dto.TicketDTO;
 import com.example.ticket_service.service.TicketService;
-import com.google.zxing.NotFoundException;
 import com.google.zxing.WriterException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.*;

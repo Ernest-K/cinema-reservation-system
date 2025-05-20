@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 public class MessageProducer {
 
     private static final Logger LOG = LoggerFactory.getLogger(MessageProducer.class);
-    private static final String TOPIC = "cinema.ticket";
+    private static final String TOPIC = "cinema.notification";
     private final KafkaTemplate<String, TicketDTO> kafkaTemplate;
 
     public MessageProducer(KafkaTemplate<String, TicketDTO> kafkaTemplate) {
