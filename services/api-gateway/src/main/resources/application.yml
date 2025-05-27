@@ -17,3 +17,20 @@ management:
     web:
       exposure:
         include: '*'
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    config-url: /v3/api-docs/swagger-config
+    urls:
+      - name: api-gateway
+        url: /v3/api-docs
+      - name: reservation-service
+        url: /reservation/v3/api-docs
+      - name: ticket-service
+        url: /ticket/v3/api-docs
+      - name: payment-service
+        url: /payment/v3/api-docs
