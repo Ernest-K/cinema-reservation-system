@@ -34,12 +34,12 @@ public class MessageConsumer {
     }
 
     @KafkaListener(topics = "cinema.failed.payment", groupId = "cinema-group", containerFactory = "paymentFailedKafkaListenerContainerFactory")
-    public void listenTicketGenerationFailed(PaymentFailedEvent event) {
-        LOG.info("Received ticket generation failed event for reservation: {}", event.getReservationId());
+    public void listenPaymentGenerationFailed(PaymentFailedEvent event) {
+        LOG.info("Received payment generation failed event for reservation: {}", event.getReservationId());
         try {
             reservationService.handlePaymentGenerationFailure(event);
         } catch (Exception e) {
-            LOG.error("Failed to process ticket generation failure for reservation {}: {}", event.getReservationId(), e.getMessage(), e);
+            LOG.error("Failed to process payment generation failure for reservation {}: {}", event.getReservationId(), e.getMessage(), e);
         }
     }
 }
