@@ -20,7 +20,7 @@ services:
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
   discovery-service:
@@ -34,6 +34,9 @@ services:
     image: pwr260654/cinema-api-gateway
     ports:
       - "8080:8080"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
     depends_on:
       - discovery-service
 
@@ -41,6 +44,9 @@ services:
     image: pwr260654/cinema-movie-service
     ports:
       - "8081:8081"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
     depends_on:
       - api-gateway
 
@@ -48,6 +54,10 @@ services:
     image: pwr260654/cinema-reservation-service
     ports:
       - "8082:8082"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
+      MOVIE_SERVICE_URL: http://movie-service:8081
     depends_on:
       - api-gateway
 
@@ -55,6 +65,9 @@ services:
     image: pwr260654/cinema-payment-service
     ports:
       - "8083:8083"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
     depends_on:
       - api-gateway
 
@@ -62,6 +75,9 @@ services:
     image: pwr260654/cinema-ticket-service
     ports:
       - "8084:8084"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
     depends_on:
       - api-gateway
 
@@ -69,6 +85,9 @@ services:
     image: pwr260654/cinema-notification-service
     ports:
       - "8085:8085"
+    environment:
+      DISCOVERY_SERVICE_URL: http://discovery-service:8761/eureka
+      BOOTSTRAP_SERVERS_URL: kafka:9092
     depends_on:
       - api-gateway
 

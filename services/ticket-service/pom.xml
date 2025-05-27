@@ -123,7 +123,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
-					<mainClass>com.example.notification_service.TicketServiceApplication</mainClass>
+					<mainClass>com.example.ticket_service.TicketServiceApplication</mainClass>
 					<layout>JAR</layout>
 				</configuration>
 				<executions>
