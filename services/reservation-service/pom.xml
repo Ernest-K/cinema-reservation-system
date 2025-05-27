@@ -116,7 +116,7 @@
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 				<configuration>
-					<mainClass>com.example.reservation_service.Reservation_ServiceApplication</mainClass>
+					<mainClass>com.example.reservation_service.ReservationServiceApplication</mainClass>
 					<layout>JAR</layout>
 				</configuration>
 				<executions>
