@@ -4,7 +4,16 @@ import com.example.payment_service.dto.TpayAuthResponse;
 import com.example.payment_service.dto.TransactionRequest;
 import com.example.payment_service.dto.TransactionResponse;
 import com.example.payment_service.dto.TransactionStatusResponse;
+import com.example.payment_service.entity.Payment;
+import com.example.payment_service.kafka.producer.MessageProducer;
 
+import com.example.payment_service.repository.PaymentRepository;
+import jakarta.ws.rs.NotFoundException;
+import org.example.commons.dto.ReservationDTO;
+import org.example.commons.events.PaymentFailedEvent;
+import org.example.commons.events.ReservationCancelledEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -16,7 +25,10 @@ import org.springframework.util.MultiValueMap;
 
 @Service
 public class PaymentService {
+    private static final Logger LOG = LoggerFactory.getLogger(PaymentService.class);
     private final RestTemplate restTemplate;
+    private final PaymentRepository paymentRepository;
+    private final MessageProducer messageProducer;
 
     @Value("${tpay.api.client-id}")
     private String clientId;
@@ -33,8 +45,10 @@ public class PaymentService {
     @Value("${tpay.transaction.mock.enabled}")
     private boolean mockEnabled;
 
-    public PaymentService(RestTemplate restTemplate) {
+    public PaymentService(RestTemplate restTemplate, PaymentRepository paymentRepository, MessageProducer messageProducer) {
         this.restTemplate = restTemplate;
+        this.paymentRepository = paymentRepository;
+        this.messageProducer = messageProducer;
     }
 
     public String getAccessToken() {
@@ -57,7 +71,7 @@ public class PaymentService {
         }
     }
 
-    public TransactionResponse createTransaction(TransactionRequest request) {
+    public TransactionResponse createTransaction(ReservationDTO reservationDTO, TransactionRequest request) {
         String token = getAccessToken();
 
         HttpHeaders headers = new HttpHeaders();
@@ -65,24 +79,28 @@ public class PaymentService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         HttpEntity<TransactionRequest> entity = new HttpEntity<>(request, headers);
-        ResponseEntity<TransactionResponse> response = restTemplate.postForEntity(
-                transactionUrl,
-                entity,
-                TransactionResponse.class
-        );
 
-
-        if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
-            System.out.println(response.getBody().getTransactionPaymentUrl());
-            return response.getBody();
-        } else {
-            throw new RuntimeException("Failed to create transaction");
+        try {
+            ResponseEntity<TransactionResponse> response = restTemplate.postForEntity(
+                    transactionUrl,
+                    entity,
+                    TransactionResponse.class
+            );
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                System.out.println(response.getBody().getTransactionPaymentUrl());
+                return response.getBody();
+            }
+        } catch (Exception e) {
+            LOG.error("Error creating transaction: {}", e.getMessage(), e);
+            messageProducer.sendPaymentFailed(new PaymentFailedEvent(reservationDTO.getId(), "Failed to create transaction: " + e.getMessage()));
         }
+
+        return null;
     }
 
     public TransactionStatusResponse getTransactionStatus(String transactionId) {
 
-        if(mockEnabled) {
+        if (mockEnabled) {
             TransactionStatusResponse transactionStatusResponse = new TransactionStatusResponse();
             transactionStatusResponse.setStatus("correct");
             return transactionStatusResponse;
@@ -106,5 +124,23 @@ public class PaymentService {
         } else {
             throw new RuntimeException("Failed to get transaction status");
         }
+    }
+
+    public void handleReservationCancellation(ReservationCancelledEvent event) {
+        Payment payment = paymentRepository.findByReservationId(event.getReservationId())
+                .orElseThrow(() -> new NotFoundException("Payment not found"));
+        if (payment == null) {
+            LOG.info("No payment found for reservation {}. Skipping compensation.", event.getReservationId());
+            return;
+        }
+
+        if ("cancelled".equals(payment.getStatus())) {
+            LOG.info("Payment for reservation {} already cancelled. Skipping.", event.getReservationId());
+            return;
+        }
+
+        LOG.info("Cancelling payment for reservation {}.", event.getReservationId());
+        payment.setStatus("cancelled");
+        paymentRepository.save(payment);
     }
 }

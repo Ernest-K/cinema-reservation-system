@@ -4,12 +4,16 @@ import org.example.commons.dto.TicketDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import com.google.zxing.WriterException;
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.MimeMessageHelper;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Recover;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.thymeleaf.TemplateEngine;
 import org.thymeleaf.context.Context;
@@ -37,6 +41,11 @@ public class NotificationService {
         this.templateEngine = templateEngine;
     }
 
+    @Retryable(
+            retryFor = {MailException.class, MessagingException.class}, // Typy wyjątków, które mają wywołać ponowienie
+            maxAttempts = 3,                                        // Maksymalna liczba prób (pierwsza + 2 ponowienia)
+            backoff = @Backoff(delay = 2000, multiplier = 2)        // Opóźnienie między próbami (2s, 4s)
+    )
     public void sendTicketNotificationEmail(TicketDTO ticketDTO) {
         LOG.info("Attempting to send ticket notification email to: {}", ticketDTO.getCustomerEmail());
         try {
@@ -84,5 +93,20 @@ public class NotificationService {
         } catch (Exception e) {
             LOG.error("An unexpected error occurred while sending email to {}: {}", ticketDTO.getCustomerEmail(), e.getMessage(), e);
         }
+    }
+
+    @Recover
+    public void recoverEmailSending(MailException e, TicketDTO ticketDTO) {
+        LOG.error("Failed to send ticket notification email to {} after multiple retries. Payload: {}. Error: {}",
+                ticketDTO.getCustomerEmail(), ticketDTO, e.getMessage(), e);
+        // Tutaj możesz dodać dodatkową logikę, np. wysłanie powiadomienia do administratora,
+        // zapisanie nieudanego eventu do innej kolejki (DLQ) itp.
+        // Na razie tylko logujemy, zgodnie z Twoim życzeniem.
+    }
+
+    @Recover
+    public void recoverEmailSending(MessagingException e, TicketDTO ticketDTO) {
+        LOG.error("Failed to send ticket notification email to {} after multiple retries due to MessagingException. Payload: {}. Error: {}",
+                ticketDTO.getCustomerEmail(), ticketDTO, e.getMessage(), e);
     }
 }

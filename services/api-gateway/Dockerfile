@@ -1,5 +1,9 @@
-FROM eclipse-temurin:21-jdk
-WORKDIR /app
-COPY target/api-gateway-0.0.1-SNAPSHOT.jar api-gateway.jar
-EXPOSE 8081
+FROM openjdk:21-jdk-slim
+
+COPY target/*.jar api-gateway.jar
+
+EXPOSE 8080
+
 ENTRYPOINT ["java", "-jar", "api-gateway.jar"]
+
+# docker build -t pwr260654/cinema-api-gateway:latest .

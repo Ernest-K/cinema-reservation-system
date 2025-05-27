@@ -2,6 +2,7 @@ package com.example.ticket_service.service;
 
 import com.example.ticket_service.kafka.producer.MessageProducer;
 import org.example.commons.dto.*;
+import org.example.commons.events.TicketGenerationFailedEvent;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.repository.TicketRepository;
 import com.google.zxing.WriterException;
@@ -41,6 +42,7 @@ public class TicketService {
 
         if (reservationDTO.getSeats() == null || reservationDTO.getSeats().isEmpty()) {
             LOG.warn("No seats found in reservation DTO for reservation ID: {}. Cannot generate ticket.", reservationDTO.getId());
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "No seats provided"));
             throw new IllegalArgumentException("Cannot generate ticket for reservation " + reservationDTO.getId() + " without seats.");
         }
 

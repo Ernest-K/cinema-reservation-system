@@ -7,6 +7,7 @@ import com.example.payment_service.entity.Payment;
 import com.example.payment_service.repository.PaymentRepository;
 import com.example.payment_service.service.PaymentService;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.events.ReservationCancelledEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.kafka.annotation.KafkaListener;
@@ -17,7 +18,6 @@ import java.time.LocalDateTime;
 @Component
 @RequiredArgsConstructor
 public class MessageConsumer {
-
     private final PaymentService paymentService;
     private final PaymentRepository paymentRepository;
     private static final Logger LOG = LoggerFactory.getLogger(MessageConsumer.class);
@@ -36,7 +36,11 @@ public class MessageConsumer {
         pay.setGroupId(150);
         request.setPay(pay);
 
-        TransactionResponse response = paymentService.createTransaction(request);
+        TransactionResponse response = paymentService.createTransaction(reservation, request);
+        if (response == null) {
+            LOG.error("Failed to create transaction for reservation: {}", reservation.getId());
+            return;
+        }
 
         Payment payment = new Payment();
         payment.setTransactionId(response.getTransactionId());
@@ -46,5 +50,15 @@ public class MessageConsumer {
         payment.setStatus("pending");
 
         paymentRepository.save(payment);
+    }
+
+    @KafkaListener(topics = "cinema.cancel.reservation", groupId = "cinema-group", containerFactory = "cancelKafkaListenerContainerFactory")
+    public void listenReservationCancelled(ReservationCancelledEvent event) {
+        LOG.info("Received reservation cancellation: {}", event.getReservationId());
+        try {
+            paymentService.handleReservationCancellation(event);
+        } catch (Exception e) {
+            LOG.error("Failed to process reservation cancellation for ID {}: {}", event.getReservationId(), e.getMessage(), e);
+        }
     }
 }

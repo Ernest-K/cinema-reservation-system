@@ -11,6 +11,11 @@ import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.example.commons.dto.*;
 import org.example.commons.enums.ReservationStatus;
+import org.example.commons.events.PaymentFailedEvent;
+import org.example.commons.events.ReservationCancelledEvent;
+import org.example.commons.events.TicketGenerationFailedEvent;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -21,6 +26,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class ReservationService {
+    private static final Logger LOG = LoggerFactory.getLogger(ReservationService.class);
     private final ReservationRepository reservationRepository;
     private final ReservedSeatRepository reservedSeatRepository;
     private final MovieServiceClient movieServiceClient;
@@ -102,12 +108,53 @@ public class ReservationService {
         if ("completed".equals(paymentStatusDTO.getStatus())) {
             reservation.setStatus(ReservationStatus.CONFIRMED);
             ticketGenerationRequest(reservation);
-        } else {
+        } else if("expired".equals(paymentStatusDTO.getStatus())) {
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.EXPIRED);
+        } else {
+            reservation.getSeats().clear();
+            reservation.setStatus(ReservationStatus.CANCELLED);
+            reservationRepository.save(reservation);
+
+            messageProducer.sendReservationCancelled(new ReservationCancelledEvent(paymentStatusDTO.getReservationId()));
         }
 
         reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public void handlePaymentGenerationFailure(PaymentFailedEvent event) {
+        Reservation reservation = reservationRepository.findById(event.getReservationId())
+                .orElseThrow(() -> new NotFoundException("Reservation not found"));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            LOG.info("Reservation {} already cancelled. Skipping compensation.", event.getReservationId());
+            return;
+        }
+
+        LOG.info("Ticket generation failed for reservation {}. Initiating compensation.", event.getReservationId());
+        reservation.getSeats().clear();
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        reservationRepository.save(reservation);
+    }
+
+    @Transactional
+    public void handleTicketGenerationFailure(TicketGenerationFailedEvent event) {
+        Reservation reservation = reservationRepository.findById(event.getReservationId())
+                .orElseThrow(() -> new NotFoundException("Reservation not found"));
+
+        if (reservation.getStatus() == ReservationStatus.CANCELLED) {
+            LOG.info("Reservation {} already cancelled. Skipping compensation.", event.getReservationId());
+            return;
+        }
+
+        LOG.info("Ticket generation failed for reservation {}. Initiating compensation.", event.getReservationId());
+        reservation.getSeats().clear();
+        reservation.setStatus(ReservationStatus.CANCELLED);
+        reservationRepository.save(reservation);
+
+        // Publikuj zdarzenie kompensacyjne, aby np. anulować płatność
+        messageProducer.sendReservationCancelled(new ReservationCancelledEvent(event.getReservationId()));
     }
 
     @Transactional

@@ -14,7 +14,7 @@
 	<artifactId>reservation-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<packaging>jar</packaging>
-	<name>reservation_-service</name>
+	<name>reservation-service</name>
 	<description>Demo project for Spring Boot</description>
 
 	<properties>
@@ -88,6 +88,11 @@
         <dependency>
           <groupId>org.springframework.kafka</groupId>
           <artifactId>spring-kafka</artifactId>
+        </dependency>
+        <dependency>
+          <groupId>org.springdoc</groupId>
+          <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
+          <version>2.2.0</version>
         </dependency>
 	</dependencies>
 
