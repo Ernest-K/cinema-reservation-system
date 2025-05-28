@@ -28,9 +28,11 @@ springdoc:
     urls:
       - name: api-gateway
         url: /v3/api-docs
+      - name: movie-service
+        url: /api/movies/v3/api-docs
       - name: reservation-service
-        url: /reservation/v3/api-docs
+        url: /api/reservations/v3/api-docs
       - name: ticket-service
-        url: /ticket/v3/api-docs
+        url: /api/tickets/v3/api-docs
       - name: payment-service
-        url: /payment/v3/api-docs
+        url: /api/payments/v3/api-docs
