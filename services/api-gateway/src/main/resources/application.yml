@@ -4,6 +4,16 @@ server:
 spring:
   application:
     name: api-gateway
+  cloud:
+    gateway:
+      forwarded:
+        enabled: true
+      globalcors:
+        cors-configurations:
+          '[/**]':
+            allowedOrigins: "*"
+            allowedMethods: [ "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD" ]
+            allowedHeaders: "*"
 
 eureka:
   client:
