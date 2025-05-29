@@ -91,4 +91,15 @@ services:
     depends_on:
       - api-gateway
 
+# docker build -t pwr260654/cinema-discovery-service:latest .\services\discovery-service\
+# docker build -t pwr260654/cinema-api-gateway:latest .\services\api-gateway\
+# docker build -t pwr260654/cinema-movie-service:latest .\services\movie-service\
+# docker build -t pwr260654/cinema-notification-service:latest .\services\notification-service\
+# docker build -t pwr260654/cinema-payment-service:latest .\services\payment-service\
+# docker build -t pwr260654/cinema-reservation-service:latest .\services\reservation-service\
+# docker build -t pwr260654/cinema-ticket-service:latest .\services\ticket-service\
+
+# docker push <tag>
+
 # docker compose up zookeeper kafka
+# docker compose logs -f -t
