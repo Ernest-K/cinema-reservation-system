@@ -7,8 +7,10 @@ import com.example.movie_service.entity.Screening;
 import com.example.movie_service.entity.Seat;
 import com.example.movie_service.repository.ScreeningRepository;
 import com.example.movie_service.repository.SeatRepository;
-import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
 @Service
 public class ScreeningService {
 
+    private static final Logger LOG = LoggerFactory.getLogger(ScreeningService.class);
     private final ScreeningRepository screeningRepository;
     private final SeatRepository seatRepository;
 
@@ -26,11 +29,19 @@ public class ScreeningService {
     }
 
     public ScreeningDTO getScreeningById(Long id) {
-        return mapToScreeningResponse(screeningRepository.findById(id).orElseThrow(() -> new NotFoundException("Nie znaleziono seansu")));
-    }
+        Screening screening = screeningRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Screening with ID " + id + " not found."));
+        return mapToScreeningResponse(screening);    }
 
     public List<SeatDTO> getSeatsById(List<Long> ids) {
-        return seatRepository.findAllById(ids).stream().map(this::mapToSeatResponse).collect(Collectors.toList());
+        if (ids == null || ids.isEmpty()) {
+            throw new IllegalArgumentException("Seat IDs list cannot be null or empty.");
+        }
+        List<Seat> seats = seatRepository.findAllById(ids);
+        if (seats.size() != ids.size()) {
+            LOG.warn("Some seats not found for IDs: {}", ids);
+        }
+        return seats.stream().map(this::mapToSeatResponse).collect(Collectors.toList());
     }
 
     private ScreeningDTO mapToScreeningResponse(Screening screening) {
