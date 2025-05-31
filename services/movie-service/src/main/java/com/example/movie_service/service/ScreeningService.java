@@ -34,9 +34,6 @@ public class ScreeningService {
         return mapToScreeningResponse(screening);    }
 
     public List<SeatDTO> getSeatsById(List<Long> ids) {
-        if (ids == null || ids.isEmpty()) {
-            throw new IllegalArgumentException("Seat IDs list cannot be null or empty.");
-        }
         List<Seat> seats = seatRepository.findAllById(ids);
         if (seats.size() != ids.size()) {
             LOG.warn("Some seats not found for IDs: {}", ids);

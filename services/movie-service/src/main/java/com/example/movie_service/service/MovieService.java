@@ -1,5 +1,6 @@
 package com.example.movie_service.service;
 
+import lombok.RequiredArgsConstructor;
 import org.example.commons.dto.MovieRatingDTO;
 import com.example.movie_service.dto.RatingDTO;
 import com.example.movie_service.entity.Movie;
@@ -22,6 +23,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
 
+@RequiredArgsConstructor
 @Service
 public class MovieService {
 
@@ -34,11 +36,6 @@ public class MovieService {
 
     @Value("${ratings.api.key}")
     private String ratingsApiKey;
-
-    public MovieService(MovieRepository movieRepository, RestTemplate restTemplate) {
-        this.movieRepository = movieRepository;
-        this.restTemplate = restTemplate;
-    }
 
     public List<MovieRatingDTO> getAllMoviesWithRatings() {
         List<Movie> movies = movieRepository.findAll();
