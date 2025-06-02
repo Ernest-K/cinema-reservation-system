@@ -3,6 +3,7 @@ package org.example.commons.dto;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.commons.enums.PaymentStatus;
 
 @Data
 @NoArgsConstructor
@@ -10,5 +11,5 @@ import lombok.NoArgsConstructor;
 public class PaymentStatusDTO {
     private Long paymentId;
     private Long reservationId;
-    private String status;
+    private PaymentStatus status;
 }
