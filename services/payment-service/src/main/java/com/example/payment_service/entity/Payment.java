@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.commons.enums.PaymentStatus;
 
 import java.time.LocalDateTime;
 
@@ -20,7 +21,9 @@ public class Payment {
     private Long id;
     private String transactionId;
     private Long reservationId;
-    private String status;
+    @Enumerated(EnumType.STRING)
+    private PaymentStatus status;
     private LocalDateTime creationDate;
     private LocalDateTime expirationDate;
+    private String paymentUrl;
 }

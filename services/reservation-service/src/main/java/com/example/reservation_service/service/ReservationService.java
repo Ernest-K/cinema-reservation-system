@@ -10,6 +10,7 @@ import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.example.commons.dto.*;
+import org.example.commons.enums.PaymentStatus;
 import org.example.commons.enums.ReservationStatus;
 import org.example.commons.events.PaymentFailedEvent;
 import org.example.commons.events.ReservationCancelledEvent;
@@ -162,11 +163,11 @@ public class ReservationService {
             return;
         }
 
-        if ("completed".equals(paymentStatusDTO.getStatus())) {
+        if (PaymentStatus.COMPLETED == paymentStatusDTO.getStatus()) {
             reservation.setStatus(ReservationStatus.CONFIRMED);
             LOG.info("Reservation ID: {} confirmed.", reservation.getId());
             ticketGenerationRequest(reservation);
-        } else if ("expired".equals(paymentStatusDTO.getStatus())) {
+        } else if (PaymentStatus.EXPIRED == paymentStatusDTO.getStatus()) {
             LOG.info("Payment for reservation ID: {} expired. Cancelling reservation.", reservation.getId());
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.EXPIRED);
