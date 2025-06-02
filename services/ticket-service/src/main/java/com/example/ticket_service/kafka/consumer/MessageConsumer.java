@@ -4,9 +4,10 @@ import org.example.commons.dto.*;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.exception.TicketAlreadyExistsException;
+import org.example.commons.exception.TicketGenerationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
@@ -20,23 +21,29 @@ public class MessageConsumer {
     @KafkaListener(topics = "cinema.ticket.request", groupId = "cinema-group")
     public void listen(ReservationDTO reservationDTO) {
         LOG.info("Received ticket generation request for reservation: {}", reservationDTO);
+
+        if (reservationDTO == null || reservationDTO.getId() == null) {
+            LOG.error("Received null or invalid ReservationDTO. Skipping processing");
+            return;
+        }
+
         try {
             Ticket ticket = ticketService.generateAndSaveTicketForReservation(reservationDTO);
-
-            LOG.info("Successfully processed ticket generation for reservation ID: {}. Ticket UID: {}",
+            LOG.info("Successfully processed ticket generation for reservation ID: {}. Ticket ID: {}",
                     reservationDTO.getId(), ticket.getId());
 
-        } catch (IllegalArgumentException e) {
-            LOG.error("Invalid data for ticket generation for reservation {}: {}", reservationDTO.getId(), e.getMessage());
-        } catch (DataIntegrityViolationException e) {
-            // Ten błąd może wystąpić, jeśli jakimś cudem wiadomość zostanie przetworzona dwa razy
-            // a idempotentność w serwisie nie przechwyci tego przed próbą zapisu do bazy.
-            // Dzięki constraintowi UNIQUE na reservation_id, druga próba zapisu się nie powiedzie.
-            LOG.warn("Data integrity violation for reservation ID: {}. Potentially a duplicate message or ticket already exists. Error: {}",
+        } catch (TicketAlreadyExistsException e) {
+            LOG.warn("Ticket generation skipped for reservation ID {}: {}. Message likely already processed.",
                     reservationDTO.getId(), e.getMessage());
+        } catch (TicketGenerationException e) {
+            LOG.error("TicketGenerationException for reservation ID {}: {}. Check if compensations are needed.",
+                    reservationDTO.getId(), e.getMessage(), e);
+        } catch (IllegalArgumentException e) {
+            LOG.error("Invalid data for ticket generation for reservation {}: {}", reservationDTO.getId(), e.getMessage(), e);
         }
         catch (Exception e) {
-            LOG.error("Error processing ticket generation request for reservation: {}", reservationDTO.getId(), e);
+            LOG.error("Unexpected error processing ticket generation request for reservation {}: {}",
+                    reservationDTO.getId(), e.getMessage(), e);
         }
     }
 }

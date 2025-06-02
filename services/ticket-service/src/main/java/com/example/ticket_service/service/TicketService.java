@@ -8,8 +8,13 @@ import com.example.ticket_service.repository.TicketRepository;
 import com.google.zxing.WriterException;
 import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.exception.ResourceNotFoundException;
+import org.example.commons.exception.TicketAlreadyExistsException;
+import org.example.commons.exception.TicketGenerationException;
+import org.example.commons.exception.TicketValidationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,25 +35,39 @@ public class TicketService {
 
     @Transactional
     public Ticket generateAndSaveTicketForReservation(ReservationDTO reservationDTO) {
-        LOG.info("Attempting to generate a single ticket for reservation ID: {}", reservationDTO.getId());
+        LOG.info("Attempting to generate ticket for reservation ID: {}", reservationDTO.getId());
 
-        // Sprawdzenie, czy bilet dla tej rezerwacji już istnieje (dzięki unique constraint na reservationId)
-        Optional<Ticket> existingTicketOpt = ticketRepository.findByReservationId(reservationDTO.getId());
-
-        if (existingTicketOpt.isPresent()) {
-            LOG.warn("Ticket for reservation ID: {} already exists. Returning existing ticket.", reservationDTO.getId());
-            return existingTicketOpt.get();
+        if (reservationDTO == null || reservationDTO.getId() == null) {
+            LOG.error("Invalid ReservationDTO received: null or missing ID.");
+            throw new TicketGenerationException("Invalid reservation data provided.");
         }
+
+        try {
+            Optional<Ticket> existingTicketOpt = ticketRepository.findByReservationId(reservationDTO.getId());
+            if (existingTicketOpt.isPresent()) {
+                LOG.warn("Ticket for reservation ID: {} already exists. ID: {}. Skipping generation.",
+                        reservationDTO.getId(), existingTicketOpt.get().getId());
+                throw new TicketAlreadyExistsException("Ticket for reservation ID " + reservationDTO.getId() + " already exists.");
+            }
+        } catch (Exception e) {
+            LOG.error("Database error while checking for existing ticket for reservation ID {}: {}", reservationDTO.getId(), e.getMessage(), e);
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Database error during ticket pre-check."));
+            throw new TicketGenerationException("Error checking for existing ticket.", e);
+        }
+
 
         if (reservationDTO.getSeats() == null || reservationDTO.getSeats().isEmpty()) {
             LOG.warn("No seats found in reservation DTO for reservation ID: {}. Cannot generate ticket.", reservationDTO.getId());
-            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "No seats provided"));
-            throw new IllegalArgumentException("Cannot generate ticket for reservation " + reservationDTO.getId() + " without seats.");
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "No seats provided in reservation."));
+            throw new TicketGenerationException("No seats provided in reservation for ID: " + reservationDTO.getId());
+        }
+        if (reservationDTO.getScreeningDTO() == null || reservationDTO.getScreeningDTO().getMovieDTO() == null || reservationDTO.getScreeningDTO().getHallDTO() == null) {
+            LOG.warn("Incomplete screening information in reservation DTO for reservation ID: {}.", reservationDTO.getId());
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Incomplete screening information."));
+            throw new TicketGenerationException("Incomplete screening information for reservation ID: " + reservationDTO.getId());
         }
 
         ScreeningDTO screening = reservationDTO.getScreeningDTO();
-
-        // Przygotowanie opisu miejsc do zapisu w encji (dla łatwiejszego odczytu)
         String seatsDescriptionAggregated = reservationDTO.getSeats().stream()
                 .map(seat -> "R" + seat.getRowNumber() + "S" + seat.getSeatNumber())
                 .collect(Collectors.joining(", "));
@@ -68,13 +87,25 @@ public class TicketService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        Ticket savedTicketWithId = ticketRepository.saveAndFlush(ticket);
+        Ticket savedTicketWithId;
+        try {
+            savedTicketWithId = ticketRepository.saveAndFlush(ticket);
+        } catch (DataIntegrityViolationException e) {
+            LOG.error("Data integrity violation while saving ticket for reservation ID {}: {}. This might indicate a race condition or a duplicate reservation ID constraint.",
+                    reservationDTO.getId(), e.getMessage(), e);
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Data integrity error saving ticket."));
+            throw new TicketAlreadyExistsException("Failed to save ticket due to data integrity issue, possibly duplicate for reservation ID " + reservationDTO.getId() + ".");
+        } catch (Exception e) {
+            LOG.error("Error saving initial ticket record for reservation ID {}: {}", reservationDTO.getId(), e.getMessage(), e);
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Database error saving ticket."));
+            throw new TicketGenerationException("Error saving ticket record.", e);
+        }
+
 
         List<String> seatsInfoListForQr = reservationDTO.getSeats().stream()
                 .map(seat -> "Row " + seat.getRowNumber() + ", Seat " + seat.getSeatNumber())
                 .collect(Collectors.toList());
 
-        // Przygotowanie danych do kodu QR
         QrCodePayloadDTO qrPayload = new QrCodePayloadDTO(
                 savedTicketWithId.getId(),
                 reservationDTO.getId(),
@@ -85,72 +116,93 @@ public class TicketService {
                 reservationDTO.getCustomerName(),
                 reservationDTO.getSeats().size()
         );
-        String qrCodeText = qrCodeGeneratorService.generateQrCodeText(qrPayload);
+
+        String qrCodeText;
+        try {
+            qrCodeText = qrCodeGeneratorService.generateQrCodeText(qrPayload);
+        } catch (RuntimeException e) {
+            LOG.error("Failed to generate QR code text for ticket ID {}: {}", savedTicketWithId.getId(), e.getMessage(), e);
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "QR code text generation failed."));
+            throw new TicketGenerationException("Failed to generate QR code text for ticket " + savedTicketWithId.getId(), e);
+        }
 
         savedTicketWithId.setQrCodeData(qrCodeText);
-        Ticket savedTicket = ticketRepository.save(savedTicketWithId);
+        Ticket finalTicket;
+        try {
+            finalTicket = ticketRepository.save(savedTicketWithId);
+        } catch (Exception e) {
+            LOG.error("Error saving ticket with QR code data for reservation ID {}: {}", reservationDTO.getId(), e.getMessage(), e);
+            producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Database error saving ticket with QR code."));
+            throw new TicketGenerationException("Error saving ticket with QR code.", e);
+        }
 
-        LOG.info("Successfully generated and saved a single ticket (UID: {}) for reservation ID: {}",
-                savedTicket.getId(), reservationDTO.getId());
+        LOG.info("Successfully generated and saved ticket ID: {} for reservation ID: {}",
+                finalTicket.getId(), reservationDTO.getId());
 
-        producer.send(mapToTicketDTO(savedTicket));
-
-        return savedTicket;
+        try {
+            producer.send(mapToTicketDTO(finalTicket));
+            LOG.info("Sent ticket ID {} to notification queue.", finalTicket.getId());
+        } catch (Exception e) {
+            LOG.error("Failed to send ticket ID {} to Kafka notification queue: {}", finalTicket.getId(), e.getMessage(), e);
+            throw new TicketGenerationException("Failed to send ticket to notification queue for ticket ID " + finalTicket.getId(), e);
+        }
+        return finalTicket;
     }
 
     @Transactional
     public TicketDTO validateTicket(Long ticketId) {
         LOG.info("Attempting to validate ticket with ID: {}", ticketId);
-
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> {
-                    LOG.warn("Ticket not found for validation with ID: {}", ticketId);
-                    return new NotFoundException("Ticket with ID " + ticketId + " not found.");
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket with ID " + ticketId + " not found for validation."));
 
         if (ticket.getValidatedAt() != null) {
-            LOG.warn("Ticket with ID: {} has already been validated at {}.", ticketId, ticket.getValidatedAt());
-            throw new NotFoundException(
-                    "Ticket with ID " + ticketId + " was already validated at " + ticket.getValidatedAt()
-            );
+            LOG.warn("Ticket ID: {} has already been validated at {}.", ticketId, ticket.getValidatedAt());
+            throw new TicketValidationException("Ticket with ID " + ticketId + " was already validated at " + ticket.getValidatedAt());
         }
 
         ticket.setValidatedAt(LocalDateTime.now());
-        Ticket validatedTicket = ticketRepository.save(ticket);
-
-        LOG.info("Ticket with ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
-        return mapToTicketDTO(validatedTicket);
+        try {
+            Ticket validatedTicket = ticketRepository.save(ticket);
+            LOG.info("Ticket ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
+            return mapToTicketDTO(validatedTicket);
+        } catch (Exception e) {
+            LOG.error("Error saving validated ticket ID {}: {}", ticketId, e.getMessage(), e);
+            throw new TicketGenerationException("Failed to save validated ticket " + ticketId, e); // Używam ogólnego, można stworzyć bardziej specyficzny
+        }
     }
 
-    @Transactional(readOnly = true) // Tylko odczyt z bazy
+    @Transactional(readOnly = true)
     public byte[] getQrCodeImageForTicket(Long ticketId) throws IOException, WriterException {
         LOG.debug("Requesting QR code image for ticket ID: {}", ticketId);
-
         Ticket ticket = ticketRepository.findById(ticketId)
-                .orElseThrow(() -> {
-                    LOG.warn("Ticket not found when requesting QR code image for ID: {}", ticketId);
-                    return new NotFoundException("Ticket with ID " + ticketId + " not found.");
-                });
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket with ID " + ticketId + " not found for QR code generation."));
 
         if (ticket.getQrCodeData() == null || ticket.getQrCodeData().isEmpty()) {
             LOG.error("QR code data is missing for ticket ID: {}", ticketId);
-            // Można rzucić inny, specyficzny wyjątek lub zwrócić domyślny obrazek błędu
-            throw new IllegalStateException("QR code data is missing for ticket " + ticketId);
+            throw new IllegalStateException("QR code data is missing for ticket " + ticketId + ". Cannot generate image.");
         }
 
-        // Generuj obrazek QR używając danych z biletu
-        return qrCodeGeneratorService.generateQrCodeImage(ticket.getQrCodeData(), 500, 500);
+        try {
+            return qrCodeGeneratorService.generateQrCodeImage(ticket.getQrCodeData(), 500, 500);
+        } catch (IOException | WriterException e) {
+            LOG.error("Failed to generate QR code image for ticket ID {}: {}", ticketId, e.getMessage(), e);
+            throw new TicketGenerationException("Failed to generate QR image for ticket " + ticketId, e);
+        }
     }
 
+    @Transactional(readOnly = true)
     public TicketDTO getTicketById(Long ticketId) {
-        Ticket ticket = ticketRepository.findById(ticketId).orElseThrow(() -> new NotFoundException("Ticket not found"));
-
+        LOG.debug("Fetching ticket by ID: {}", ticketId);
+        Ticket ticket = ticketRepository.findById(ticketId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket with ID " + ticketId + " not found."));
         return mapToTicketDTO(ticket);
     }
 
+    @Transactional(readOnly = true)
     public TicketDTO getTicketByReservationId(Long reservationId) {
-        Ticket ticket = ticketRepository.findByReservationId(reservationId).orElseThrow(() -> new NotFoundException("Ticket not found"));
-
+        LOG.debug("Fetching ticket by reservation ID: {}", reservationId);
+        Ticket ticket = ticketRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket for reservation ID " + reservationId + " not found."));
         return mapToTicketDTO(ticket);
     }
 
