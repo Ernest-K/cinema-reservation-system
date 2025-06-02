@@ -1,5 +1,6 @@
 package com.example.notification_service.service;
 
+import lombok.RequiredArgsConstructor;
 import org.example.commons.dto.TicketDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,7 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 
 @Service
+@RequiredArgsConstructor
 public class NotificationService {
     private static final Logger LOG = LoggerFactory.getLogger(NotificationService.class);
     private final JavaMailSender javaMailSender;
@@ -33,13 +35,7 @@ public class NotificationService {
 
     private static final int QR_CODE_WIDTH = 250;
     private static final int QR_CODE_HEIGHT = 250;
-    private static final String QR_IMAGE_RESOURCE_NAME = "ticketQrCode"; // Identyfikator dla CID
-
-    public NotificationService(JavaMailSender javaMailSender, QrCodeGeneratorService qrCodeGeneratorService, TemplateEngine templateEngine) {
-        this.javaMailSender = javaMailSender;
-        this.qrCodeGeneratorService = qrCodeGeneratorService;
-        this.templateEngine = templateEngine;
-    }
+    private static final String QR_IMAGE_RESOURCE_NAME = "ticketQrCode";
 
     @Retryable(
             retryFor = {MailException.class, MessagingException.class}, // Typy wyjątków, które mają wywołać ponowienie
@@ -48,6 +44,16 @@ public class NotificationService {
     )
     public void sendTicketNotificationEmail(TicketDTO ticketDTO) {
         LOG.info("Attempting to send ticket notification email to: {}", ticketDTO.getCustomerEmail());
+
+        if (ticketDTO.getCustomerEmail() == null || ticketDTO.getCustomerEmail().isEmpty()) {
+            LOG.error("Customer email is missing for ticket ID: {}. Cannot send notification.", ticketDTO.getId());
+            throw new IllegalArgumentException("Customer email is missing in TicketDTO.");
+        }
+        if (ticketDTO.getQrCodeData() == null || ticketDTO.getQrCodeData().isEmpty()) {
+            LOG.error("QR code data is missing for ticket ID: {}. Cannot send notification.", ticketDTO.getId());
+            throw new IllegalArgumentException("QR code data is missing in TicketDTO.");
+        }
+
         try {
             byte[] qrImageBytes = qrCodeGeneratorService.generateQrCodeImage(
                     ticketDTO.getQrCodeData(), QR_CODE_WIDTH, QR_CODE_HEIGHT
@@ -68,16 +74,15 @@ public class NotificationService {
             context.setVariable("hallInfo", ticketDTO.getHallNumber());
             context.setVariable("seatsInfo", ticketDTO.getSeatsDescription());
             context.setVariable("reservationId", ticketDTO.getReservationId());
-            context.setVariable("qrImageResourceName", QR_IMAGE_RESOURCE_NAME); // Przekazanie nazwy zasobu do szablonu
+            context.setVariable("qrImageResourceName", QR_IMAGE_RESOURCE_NAME);
 
-            String htmlContent = templateEngine.process("ticket-email", context); // Nazwa pliku szablonu bez .html
+            String htmlContent = templateEngine.process("ticket-email", context);
 
             helper.setTo(ticketDTO.getCustomerEmail());
             helper.setFrom(senderEmail);
             helper.setSubject("Your Cinema Ticket for " + ticketDTO.getMovieTitle());
-            helper.setText(htmlContent, true); // true oznacza, że treść to HTML
+            helper.setText(htmlContent, true);
 
-            // Dodanie obrazka QR jako zasobu inline (CID)
             ByteArrayResource qrImageResource = new ByteArrayResource(qrImageBytes);
             helper.addInline(QR_IMAGE_RESOURCE_NAME, qrImageResource, "image/png");
 
@@ -99,9 +104,6 @@ public class NotificationService {
     public void recoverEmailSending(MailException e, TicketDTO ticketDTO) {
         LOG.error("Failed to send ticket notification email to {} after multiple retries. Payload: {}. Error: {}",
                 ticketDTO.getCustomerEmail(), ticketDTO, e.getMessage(), e);
-        // Tutaj możesz dodać dodatkową logikę, np. wysłanie powiadomienia do administratora,
-        // zapisanie nieudanego eventu do innej kolejki (DLQ) itp.
-        // Na razie tylko logujemy, zgodnie z Twoim życzeniem.
     }
 
     @Recover
