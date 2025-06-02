@@ -38,7 +38,7 @@ public class MessageConsumer {
         }
 
         try {
-            notificationService.sendTicketNotificationEmail(ticketDTO);
+            notificationService.processAndSendTicketNotification(ticketDTO);
         } catch (IllegalArgumentException e) {
             LOG.error("Illegal argument while processing notification for ticket ID {}: {}. Message might be problematic.",
                     ticketDTO.getId(), e.getMessage(), e);
