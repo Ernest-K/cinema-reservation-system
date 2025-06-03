@@ -1,0 +1,1083 @@
+{
+	"info": {
+		"_postman_id": "1ae8d8fd-9732-45e6-ba37-d02ea7d2fd3b",
+		"name": "Cinema Reservation System - Full Flow",
+		"description": "Test collection for the entire cinema reservation system microservices.",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "15412160"
+	},
+	"item": [
+		{
+			"name": "Movie Service",
+			"item": [
+				{
+					"name": "Get All Movies",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/movies",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"movies"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Search Movies by Title",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/movies/search?title=Godfather",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"movies",
+								"search"
+							],
+							"query": [
+								{
+									"key": "title",
+									"value": "Godfather",
+									"description": "Replace with a movie title present in your DB"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Screenings for a Movie",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.length > 0) {",
+									"    pm.collectionVariables.set(\"screeningId\", jsonData[0].id);",
+									"    pm.collectionVariables.set(\"movieIdForReservation\", jsonData[0].movieDTO.id);",
+									"    console.log('Set screeningId to: ' + jsonData[0].id);",
+									"    console.log('Set movieIdForReservation to: ' + jsonData[0].movieDTO.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/movies/{{movieId}}/screenings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"movies",
+								"{{movieId}}",
+								"screenings"
+							],
+							"variable": [
+								{
+									"key": "movieId",
+									"value": "1",
+									"description": "Replace with an existing Movie ID"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Screening Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/movies/screenings/{{screeningIdFromList}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"movies",
+								"screenings",
+								"{{screeningIdFromList}}"
+							],
+							"variable": [
+								{
+									"key": "screeningIdFromList",
+									"value": "{{screeningId}}",
+									"description": "This should be set by 'Get Screenings for a Movie' request"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Seat Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/movies/seats?ids=1,2",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"movies",
+								"seats"
+							],
+							"query": [
+								{
+									"key": "ids",
+									"value": "1,2",
+									"description": "Replace with existing Seat IDs for a given screening"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for Movie and Screening information"
+		},
+		{
+			"name": "Reservation Service",
+			"item": [
+				{
+					"name": "Create Reservation",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.id) {",
+									"    pm.collectionVariables.set(\"reservationId\", jsonData.id);",
+									"    console.log('Set reservationId to: ' + jsonData.id);",
+									"}",
+									"",
+									"if (jsonData && jsonData.paymentDetails && jsonData.paymentDetails.paymentUrl) {",
+									"    pm.collectionVariables.set(\"paymentUrl\", jsonData.paymentDetails.paymentUrl);",
+									"    console.log('Set paymentUrl to: ' + jsonData.paymentDetails.paymentUrl);",
+									"}",
+									"",
+									"if (jsonData && jsonData.id) {",
+									"    pm.collectionVariables.set(\"paymentId\", jsonData.id);",
+									"    console.log('Set paymentId to: ' + jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript",
+								"packages": {}
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [6] \n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/reservations",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"reservations"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reserved Seats for Screening",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reservations/screenings/{{screeningId}}/seats/availability",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"reservations",
+								"screenings",
+								"{{screeningId}}",
+								"seats",
+								"availability"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Reservation Details",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reservations/{{reservationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"reservations",
+								"{{reservationId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Cancel Reservation (Manual)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/reservations/{{reservationIdToCancel}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"reservations",
+								"{{reservationIdToCancel}}"
+							],
+							"variable": [
+								{
+									"key": "reservationIdToCancel",
+									"value": "{{reservationId}}",
+									"description": "ID rezerwacji do anulowania"
+								}
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing reservations"
+		},
+		{
+			"name": "Payment Service",
+			"item": [
+				{
+					"name": "Get Payments",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Payment Details",
+					"request": {
+						"method": "GET",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/payments/{{paymentId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"payments",
+								"{{paymentId}}"
+							]
+						}
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Ticket Service",
+			"item": [
+				{
+					"name": "Get Ticket by Reservation ID (after payment)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"exec": [
+									"var jsonData = pm.response.json();",
+									"if (jsonData && jsonData.id) {",
+									"    pm.collectionVariables.set(\"ticketId\", jsonData.id);",
+									"    console.log('Set ticketId to: ' + jsonData.id);",
+									"}"
+								],
+								"type": "text/javascript"
+							}
+						}
+					],
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/reservation/{{reservationId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"reservation",
+								"{{reservationId}}"
+							]
+						},
+						"description": "Ten endpoint zadziała poprawnie, gdy rezerwacja zostanie potwierdzona (po pomyślnej płatności) i bilet zostanie wygenerowany."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket by Ticket ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"{{ticketId}}"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket QR Code Image",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/{{ticketId}}/qr-code",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"{{ticketId}}",
+								"qr-code"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Validate Ticket",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/{{ticketId}}/validate",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"{{ticketId}}",
+								"validate"
+							]
+						}
+					},
+					"response": []
+				}
+			],
+			"description": "Endpoints for managing tickets"
+		},
+		{
+			"name": "Notification Service",
+			"item": []
+		},
+		{
+			"name": "Error & Compensation Scenarios",
+			"item": [
+				{
+					"name": "Reservation Service - Errors",
+					"item": [
+						{
+							"name": "Create Reservation - Invalid Input (e.g., empty email)",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": {{movieIdForReservation}},\n    \"screeningId\": {{screeningId}},\n    \"customerName\": \"Invalid User\",\n    \"customerEmail\": \"\", \n    \"seatIds\": [1001, 1002]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 400 Bad Request z komunikatem walidacyjnym dla customerEmail."
+							},
+							"response": []
+						},
+						{
+							"name": "Create Reservation - Non-existent Screening",
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": 1,\n    \"screeningId\": 99999, \n    \"customerName\": \"Valid User\",\n    \"customerEmail\": \"valid@example.com\",\n    \"seatIds\": [1,2]\n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 404 Not Found lub 502 Bad Gateway (jeśli MovieServiceClient zwróci 404 i tak jest to mapowane)."
+							},
+							"response": []
+						},
+						{
+							"name": "Create Reservation - Unavailable Seats",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"// Ten skrypt zakłada, że najpierw tworzysz poprawną rezerwację na miejsca 1, 2",
+											"// dla {{screeningId}}, a potem próbujesz zarezerwować je ponownie."
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": {{movieIdForReservation}},\n    \"screeningId\": {{screeningId}},\n    \"customerName\": \"Conflict User\",\n    \"customerEmail\": \"conflict@example.com\",\n    \"seatIds\": [1, 2] \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								},
+								"description": "Najpierw wykonaj 'Create Reservation' z Happy Path, aby zająć miejsca. Potem wykonaj to żądanie z tymi samymi seatIds.\nOczekiwana odpowiedź: 409 Conflict."
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Non-existent Reservation",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations/999999",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations",
+										"999999"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 404 Not Found."
+							},
+							"response": []
+						},
+						{
+							"name": "Create Reservation - Movie not working",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = pm.response.json();",
+											"if (jsonData && jsonData.id) {",
+											"    pm.collectionVariables.set(\"reservationId\", jsonData.id);",
+											"    console.log('Set reservationId to: ' + jsonData.id);",
+											"}",
+											"// Assuming payment service will provide a payment URL in its flow",
+											"// If the reservation response contains a payment URL directly (e.g. from a mock):",
+											"if (jsonData && jsonData.paymentDetails && jsonData.paymentDetails.paymentUrl) {",
+											"    pm.collectionVariables.set(\"paymentUrl\", jsonData.paymentDetails.paymentUrl);",
+											"    console.log('Set paymentUrl to: ' + jsonData.paymentDetails.paymentUrl);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [1] \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Reservation - Payment not working",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = pm.response.json();",
+											"if (jsonData && jsonData.id) {",
+											"    pm.collectionVariables.set(\"reservationId\", jsonData.id);",
+											"    console.log('Set reservationId to: ' + jsonData.id);",
+											"}",
+											"// Assuming payment service will provide a payment URL in its flow",
+											"// If the reservation response contains a payment URL directly (e.g. from a mock):",
+											"if (jsonData && jsonData.paymentDetails && jsonData.paymentDetails.paymentUrl) {",
+											"    pm.collectionVariables.set(\"paymentUrl\", jsonData.paymentDetails.paymentUrl);",
+											"    console.log('Set paymentUrl to: ' + jsonData.paymentDetails.paymentUrl);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [2] \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Cancel Reservation when pending payment",
+							"request": {
+								"method": "DELETE",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations/{{reservationIdToCancel}}",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations",
+										"{{reservationIdToCancel}}"
+									],
+									"variable": [
+										{
+											"key": "reservationIdToCancel",
+											"value": "{{reservationId}}",
+											"description": "ID rezerwacji do anulowania"
+										}
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Create Reservation - wrong payload",
+							"event": [
+								{
+									"listen": "test",
+									"script": {
+										"exec": [
+											"var jsonData = pm.response.json();",
+											"if (jsonData && jsonData.id) {",
+											"    pm.collectionVariables.set(\"reservationId\", jsonData.id);",
+											"    console.log('Set reservationId to: ' + jsonData.id);",
+											"}",
+											"// Assuming payment service will provide a payment URL in its flow",
+											"// If the reservation response contains a payment URL directly (e.g. from a mock):",
+											"if (jsonData && jsonData.paymentDetails && jsonData.paymentDetails.paymentUrl) {",
+											"    pm.collectionVariables.set(\"paymentUrl\", jsonData.paymentDetails.paymentUrl);",
+											"    console.log('Set paymentUrl to: ' + jsonData.paymentDetails.paymentUrl);",
+											"}"
+										],
+										"type": "text/javascript",
+										"packages": {}
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [
+									{
+										"key": "Content-Type",
+										"value": "application/json"
+									}
+								],
+								"body": {
+									"mode": "raw",
+									"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [3] \n}",
+									"options": {
+										"raw": {
+											"language": "json"
+										}
+									}
+								},
+								"url": {
+									"raw": "{{baseUrl}}/api/reservations",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"reservations"
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Payment & Ticket Scenarios (Indirect/Simulated)",
+					"item": [
+						{
+							"name": "Scenario: Payment Expires",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://example.com/info_only_no_actual_call",
+									"protocol": "https",
+									"host": [
+										"example",
+										"com"
+									],
+									"path": [
+										"info_only_no_actual_call"
+									]
+								},
+								"description": "1. Utwórz rezerwację (będzie PENDING_PAYMENT).\n2. Poczekaj, aż `expirationDate` dla płatności w `payment-service` minie (np. 1-2 minuty, jeśli tak ustawiłeś).\n3. `TransactionScheduler` w `payment-service` powinien oznaczyć płatność jako 'expired' i wysłać event.\n4. `ReservationService` powinien odebrać event i zmienić status rezerwacji na `EXPIRED`.\n**Test:** Sprawdź status rezerwacji przez 'Get Reservation Details'. Powinien być `EXPIRED`."
+							},
+							"response": []
+						},
+						{
+							"name": "Scenario: Payment Fails (Simulated)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://example.com/info_only_no_actual_call",
+									"protocol": "https",
+									"host": [
+										"example",
+										"com"
+									],
+									"path": [
+										"info_only_no_actual_call"
+									]
+								},
+								"description": "Symulacja nieudanej płatności jest trudniejsza bez modyfikacji `payment-service`.\nMożliwe podejścia:\n- Jeśli TPay pozwala na symulację błędu (np. specjalną kwotą, danymi karty testowej powodującej błąd).\n- Tymczasowa modyfikacja `TransactionScheduler` w `payment-service`, aby dla testowej rezerwacji oznaczył płatność jako 'failed'.\n- Dodanie endpointu w `payment-service` do manualnego ustawienia statusu płatności na 'failed' dla celów testowych.\n\nGdy płatność zawiedzie, `payment-service` powinien wysłać `PaymentFailedEvent`.\n`ReservationService` powinien odebrać ten event i zmienić status rezerwacji na `CANCELLED`.\n**Test:** Sprawdź status rezerwacji. Powinien być `CANCELLED`."
+							},
+							"response": []
+						},
+						{
+							"name": "Scenario: Ticket Generation Fails (Simulated)",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://example.com/info_only_no_actual_call",
+									"protocol": "https",
+									"host": [
+										"example",
+										"com"
+									],
+									"path": [
+										"info_only_no_actual_call"
+									]
+								},
+								"description": "1. Przeprowadź pomyślną rezerwację i płatność (rezerwacja staje się `CONFIRMED`).\n2. `ReservationService` wysyła żądanie do `TicketService`.\n3. Aby zasymulować błąd w `TicketService`:\n    - Możesz tymczasowo zmodyfikować `TicketService.generateAndSaveTicketForReservation`, aby rzucał wyjątek dla konkretnego ID rezerwacji.\n    - Możesz zatrzymać `TicketService` przed wysłaniem żądania o bilet (ale to testuje bardziej odporność na niedostępność serwisu).\n4. `TicketService` powinien wysłać `TicketGenerationFailedEvent`.\n5. `ReservationService` powinien odebrać ten event, zmienić status rezerwacji na `CANCELLED` i wysłać `ReservationCancelledEvent` (aby np. `PaymentService` mógł zainicjować zwrot).\n**Test:** Sprawdź status rezerwacji (powinien być `CANCELLED`). Sprawdź, czy `PaymentService` otrzymał `ReservationCancelledEvent` (logi)."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Ticket Service - Errors",
+					"item": [
+						{
+							"name": "Get Ticket for Non-existent Reservation",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/tickets/reservation/999999",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"tickets",
+										"reservation",
+										"999999"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 404 Not Found (z `TicketService`)."
+							},
+							"response": []
+						},
+						{
+							"name": "Get Ticket QR for Non-existent Ticket",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/tickets/999999/qr-code",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"tickets",
+										"999999",
+										"qr-code"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 404 Not Found."
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Non-existent Ticket",
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/tickets/999999/validate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"tickets",
+										"999999",
+										"validate"
+									]
+								},
+								"description": "Oczekiwana odpowiedź: 404 Not Found."
+							},
+							"response": []
+						},
+						{
+							"name": "Validate Already Validated Ticket",
+							"event": [
+								{
+									"listen": "prerequest",
+									"script": {
+										"exec": [
+											"// Ten skrypt zakłada, że najpierw tworzysz rezerwację, płacisz,",
+											"// bilet jest generowany (ustawiasz {{ticketId}}),",
+											"// następnie wykonujesz 'Validate Ticket' raz, a potem to żądanie ponownie."
+										],
+										"type": "text/javascript"
+									}
+								}
+							],
+							"request": {
+								"method": "POST",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/tickets/{{ticketId}}/validate",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"tickets",
+										"{{ticketId}}",
+										"validate"
+									]
+								},
+								"description": "Najpierw przeprowadź pełny happy path, zwaliduj bilet raz. Potem wykonaj to żądanie ponownie.\nOczekiwana odpowiedź: 409 Conflict."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Notification Service - SMTP Error (Manual Test)",
+					"item": [
+						{
+							"name": "INFO - Simulate SMTP Authentication Error",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "https://example.com/info_only_no_actual_call_smtp_error",
+									"protocol": "https",
+									"host": [
+										"example",
+										"com"
+									],
+									"path": [
+										"info_only_no_actual_call_smtp_error"
+									]
+								},
+								"description": "1. W `notification-service` w pliku `application.properties` celowo zmień hasło do poczty WP na niepoprawne.\n   `spring.mail.password=ZLE_HASLO_DO_TESTOW`\n2. Zrestartuj `notification-service`.\n3. Przeprowadź proces rezerwacji i płatności tak, aby `ticket-service` wysłał event do `notification-service`.\n4. Obserwuj logi `notification-service`.\n**Oczekiwane zachowanie:**\n   - Zobaczysz próby wysyłki e-maila (np. 3 razy, jeśli tak skonfigurowałeś `@Retryable`).\n   - Każda próba zakończy się `MailAuthenticationException`.\n   - Po ostatniej nieudanej próbie, powinna zostać wywołana metoda `@Recover` (`recoverEmailSending`), która zaloguje ostateczne niepowodzenie."
+							},
+							"response": []
+						}
+					]
+				},
+				{
+					"name": "Movie Service - Errors",
+					"item": [
+						{
+							"name": "Pobranie seansów dla nieistniejącego filmu",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/movies/999/screenings",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"movies",
+										"999",
+										"screenings"
+									]
+								}
+							},
+							"response": []
+						},
+						{
+							"name": "Pobranie miejsc (seats) o nieistniejących ID",
+							"request": {
+								"method": "GET",
+								"header": [],
+								"url": {
+									"raw": "{{baseUrl}}/api/movies/seats?ids=99998,99999,1",
+									"host": [
+										"{{baseUrl}}"
+									],
+									"path": [
+										"api",
+										"movies",
+										"seats"
+									],
+									"query": [
+										{
+											"key": "ids",
+											"value": "99998,99999,1"
+										}
+									]
+								}
+							},
+							"response": []
+						}
+					]
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8080",
+			"type": "string"
+		},
+		{
+			"key": "movieId",
+			"value": "1",
+			"type": "string"
+		},
+		{
+			"key": "screeningId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "movieIdForReservation",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reservationId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "ticketId",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "paymentUrl",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "reservationIdToCancel",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "paymentId",
+			"value": ""
+		}
+	]
+}
