@@ -5,5 +5,3 @@ COPY target/*.jar notification-service.jar
 EXPOSE 8085
 
 ENTRYPOINT ["java", "-jar", "notification-service.jar"]
-
-# docker build -t pwr260654/cinema-notification-service:latest .
