@@ -17,7 +17,7 @@ public class MessageConsumer {
     private final ReservationService reservationService;
     private static final Logger LOG = LoggerFactory.getLogger(MessageConsumer.class);
 
-    @KafkaListener(topics = "cinema.payment.status", groupId = "cinema-group")
+    @KafkaListener(topics = "cinema.payment.status", groupId = "cinema-group", containerFactory = "kafkaListenerContainerFactory")
     public void listen(PaymentStatusDTO paymentStatusDTO) {
         LOG.info("Payment status received: {}", paymentStatusDTO);
         reservationService.updateReservationStatus(paymentStatusDTO);

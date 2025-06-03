@@ -2,6 +2,7 @@ package com.example.ticket_service.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.example.commons.enums.TicketStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -42,4 +43,7 @@ public class Ticket {
 
     private LocalDateTime validatedAt;
     private LocalDateTime createdAt;
+
+    @Enumerated(EnumType.STRING)
+    private TicketStatus status;
 }

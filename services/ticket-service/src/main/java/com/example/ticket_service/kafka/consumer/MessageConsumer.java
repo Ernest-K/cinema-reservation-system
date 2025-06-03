@@ -4,6 +4,7 @@ import org.example.commons.dto.*;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.service.TicketService;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.events.ReservationCancelledEvent;
 import org.example.commons.exception.TicketAlreadyExistsException;
 import org.example.commons.exception.TicketGenerationException;
 import org.slf4j.Logger;
@@ -44,6 +45,17 @@ public class MessageConsumer {
         catch (Exception e) {
             LOG.error("Unexpected error processing ticket generation request for reservation {}: {}",
                     reservationDTO.getId(), e.getMessage(), e);
+        }
+    }
+
+    @KafkaListener(topics = "cinema.cancel.reservation", groupId = "cinema-group", containerFactory = "reservationCancelledEventKafkaListenerContainerFactory")
+    public void listenToReservationCancellation(ReservationCancelledEvent event) {
+        LOG.info("Received reservation cancellation event for reservation ID: {}", event.getReservationId());
+        try {
+            ticketService.handleReservationCancellation(event.getReservationId());
+        } catch (Exception e) {
+            LOG.error("Error handling reservation cancellation for ticket linked to reservation ID {}: {}",
+                    event.getReservationId(), e.getMessage(), e);
         }
     }
 }

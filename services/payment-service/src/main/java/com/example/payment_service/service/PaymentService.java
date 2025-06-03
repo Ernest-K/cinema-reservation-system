@@ -8,16 +8,21 @@ import com.example.payment_service.entity.Payment;
 import com.example.payment_service.kafka.producer.MessageProducer;
 
 import com.example.payment_service.repository.PaymentRepository;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.dto.PaymentDTO;
 import org.example.commons.dto.ReservationDTO;
 import org.example.commons.enums.PaymentStatus;
 import org.example.commons.events.PaymentFailedEvent;
 import org.example.commons.events.ReservationCancelledEvent;
 import org.example.commons.exception.PaymentProcessingException;
+import org.example.commons.exception.ResourceNotFoundException;
 import org.example.commons.exception.TpayCommunicationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestClientException;
@@ -222,5 +227,35 @@ public class PaymentService {
         payment.setStatus(PaymentStatus.CANCELLED); // Lub "pending_refund" jeśli jest proces zwrotu
         paymentRepository.save(payment);
         LOG.info("Payment for reservation ID: {} marked as cancelled.", event.getReservationId());
+    }
+
+    @Transactional
+    public Page<PaymentDTO> getAllPayments(Pageable pageable) {
+        LOG.debug("Fetching all payments with pagination: {}", pageable);
+        return paymentRepository.findAll(pageable)
+                .map(PaymentService::mapToPaymentDTO);
+    }
+
+    @Transactional
+    public PaymentDTO getPaymentById(Long paymentId) {
+        LOG.debug("Fetching payment by ID: {}", paymentId);
+        return paymentRepository.findById(paymentId)
+                .map(PaymentService::mapToPaymentDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("Payment with ID " + paymentId + " not found."));
+    }
+
+    public static PaymentDTO mapToPaymentDTO(Payment payment) {
+        if (payment == null) {
+            return null;
+        }
+        return PaymentDTO.builder()
+                .id(payment.getId())
+                .tpayTransactionId(payment.getTransactionId())
+                .reservationId(payment.getReservationId())
+                .status(payment.getStatus())
+                .creationDate(payment.getCreationDate())
+                .expirationDate(payment.getExpirationDate())
+                .paymentUrl(payment.getPaymentUrl())
+                .build();
     }
 }

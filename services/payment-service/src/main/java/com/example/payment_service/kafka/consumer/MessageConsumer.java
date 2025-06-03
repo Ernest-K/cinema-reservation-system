@@ -74,7 +74,7 @@ public class MessageConsumer {
         }
     }
 
-    @KafkaListener(topics = "cinema.cancel.reservation", groupId = "cinema-group", containerFactory = "cancelKafkaListenerContainerFactory")
+    @KafkaListener(topics = "cinema.cancel.reservation", groupId = "cinema-group-payment", containerFactory = "cancelKafkaListenerContainerFactory")
     public void listenReservationCancelled(ReservationCancelledEvent event) {
         LOG.info("Received reservation cancellation event: Reservation ID {}", event.getReservationId());
         try {

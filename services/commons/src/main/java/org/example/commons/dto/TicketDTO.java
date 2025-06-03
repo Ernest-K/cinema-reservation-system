@@ -8,6 +8,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.example.commons.enums.TicketStatus;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -38,4 +39,5 @@ public class TicketDTO {
     private String qrCodeData;
     private LocalDateTime createdAt;
     private LocalDateTime validatedAt;
+    private TicketStatus status;
 }

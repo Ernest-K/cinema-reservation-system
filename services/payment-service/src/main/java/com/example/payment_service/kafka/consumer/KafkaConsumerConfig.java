@@ -45,11 +45,12 @@ public class KafkaConsumerConfig {
     public ConsumerFactory<String, ReservationCancelledEvent> cancelConsumerFactory() {
         Map<String, Object> configProps = new HashMap<>();
         configProps.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
-        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group");
+        configProps.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-payment");
         configProps.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
         configProps.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
-        String TRUSTED_PACKAGES = "org.example.commons.dto,org.example.commons.enums,com.example.reservation_service.dto";
-        configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.events");
+        configProps.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*");
+        configProps.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ReservationCancelledEvent");
+        configProps.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
         return new DefaultKafkaConsumerFactory<>(configProps,
                 new StringDeserializer(),
                 new JsonDeserializer<>(ReservationCancelledEvent.class, false));

@@ -2,6 +2,7 @@ package com.example.ticket_service.service;
 
 import com.example.ticket_service.kafka.producer.MessageProducer;
 import org.example.commons.dto.*;
+import org.example.commons.enums.TicketStatus;
 import org.example.commons.events.TicketGenerationFailedEvent;
 import com.example.ticket_service.entity.Ticket;
 import com.example.ticket_service.repository.TicketRepository;
@@ -55,7 +56,6 @@ public class TicketService {
             throw new TicketGenerationException("Error checking for existing ticket.", e);
         }
 
-
         if (reservationDTO.getSeats() == null || reservationDTO.getSeats().isEmpty()) {
             LOG.warn("No seats found in reservation DTO for reservation ID: {}. Cannot generate ticket.", reservationDTO.getId());
             producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "No seats provided in reservation."));
@@ -85,6 +85,7 @@ public class TicketService {
                 .qrCodeData("")
                 .seatsDescription(seatsDescriptionAggregated)
                 .createdAt(LocalDateTime.now())
+                .status(TicketStatus.VALID)
                 .build();
 
         Ticket savedTicketWithId;
@@ -160,7 +161,18 @@ public class TicketService {
             throw new TicketValidationException("Ticket with ID " + ticketId + " was already validated at " + ticket.getValidatedAt());
         }
 
+        if (ticket.getStatus() == TicketStatus.USED) {
+            LOG.warn("Ticket ID: {} has already been used (status: {}). Validated at {}", ticketId, ticket.getStatus(), ticket.getValidatedAt());
+            throw new TicketValidationException("Ticket with ID " + ticketId + " was already used at " + ticket.getValidatedAt());
+        }
+
+        if (ticket.getStatus() == TicketStatus.CANCELLED) {
+            LOG.warn("Attempt to validate a CANCELLED ticket ID: {}.", ticketId);
+            throw new TicketValidationException("Ticket with ID " + ticketId + " is CANCELLED and cannot be validated.");
+        }
+
         ticket.setValidatedAt(LocalDateTime.now());
+        ticket.setStatus(TicketStatus.USED);
         try {
             Ticket validatedTicket = ticketRepository.save(ticket);
             LOG.info("Ticket ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
@@ -206,6 +218,27 @@ public class TicketService {
         return mapToTicketDTO(ticket);
     }
 
+    @Transactional
+    public void handleReservationCancellation(Long reservationId) {
+        LOG.info("Handling ticket invalidation for cancelled reservation ID: {}", reservationId);
+        Optional<Ticket> ticketOpt = ticketRepository.findByReservationId(reservationId);
+        if (ticketOpt.isPresent()) {
+            Ticket ticket = ticketOpt.get();
+            if (ticket.getStatus() == TicketStatus.USED) {
+                LOG.warn("Reservation ID: {} was cancelled, but its ticket ID: {} was already USED at {}. This is an unusual scenario requiring review.",
+                        reservationId, ticket.getId(), ticket.getValidatedAt());
+            } else if (ticket.getStatus() != TicketStatus.CANCELLED) {
+                ticket.setStatus(TicketStatus.CANCELLED);
+                ticketRepository.save(ticket);
+                LOG.info("Ticket ID: {} (for reservation ID: {}) marked as CANCELLED.", ticket.getId(), reservationId);
+            } else {
+                LOG.info("Ticket ID: {} (for reservation ID: {}) was already CANCELLED.", ticket.getId(), reservationId);
+            }
+        } else {
+            LOG.info("No ticket found for reservation ID {} during cancellation handling. No action for ticket.", reservationId);
+        }
+    }
+
     private TicketDTO mapToTicketDTO(Ticket ticket) {
         return TicketDTO.builder()
                 .id(ticket.getId())
@@ -221,6 +254,7 @@ public class TicketService {
                 .qrCodeData(ticket.getQrCodeData())
                 .createdAt(ticket.getCreatedAt())
                 .validatedAt(ticket.getValidatedAt())
+                .status(ticket.getStatus())
                 .build();
     }
 }
