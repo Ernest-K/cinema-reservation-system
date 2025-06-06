@@ -4,6 +4,8 @@ import org.example.commons.dto.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.example.commons.events.ReservationCancelledEvent;
+import org.example.commons.events.ScreeningUpdatedEvent;
+import org.example.commons.events.ScreeningCancelledEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -60,4 +62,51 @@ public class KafkaConsumerConfig {
         factory.setConsumerFactory(reservationCancelledEventConsumerFactory());
         return factory;
     }
+
+    @Bean
+    public ConsumerFactory<String, ScreeningUpdatedEvent> screeningUpdatedEventConsumerFactoryTicket() { // Dodaj suffix np. Ticket
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        // Dedykowana grupa dla ticket-service, aby oba (reservation i ticket) otrzymały event
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-ticket");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*,java.util,java.time,java.math");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ScreeningUpdatedEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ScreeningUpdatedEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> screeningUpdatedEventKafkaListenerContainerFactory() { // Ta nazwa była w błędzie
+        ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(screeningUpdatedEventConsumerFactoryTicket()); // Użyj poprawnej ConsumerFactory
+        // TODO: Rozważ ErrorHandler + DLT
+        return factory;
+    }
+
+    // Dla ScreeningCancelledEvent (jeśli ticket-service też ma na niego reagować inaczej niż na ReservationCancelledEvent)
+    // Jeśli ReservationCancelledEvent wystarcza (bo zawiera reservationId, a ticket ma reservationId),
+    // to osobny listener na ScreeningCancelledEvent w TicketService może nie być potrzebny,
+    // chyba że chcesz logiki specyficznej dla anulowania *seansu* a nie *rezerwacji*.
+    // Obecnie masz już listener na ReservationCancelledEvent, który powinien obsłużyć anulowanie biletu.
+    // Poniższy bean jest na wypadek, gdybyś miał dedykowany listener dla ScreeningCancelledEvent w TicketService.
+
+    @Bean
+    public ConsumerFactory<String, ScreeningCancelledEvent> screeningCancelledEventConsumerFactoryTicket() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-ticket");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ScreeningCancelledEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ScreeningCancelledEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> screeningCancelledEventKafkaListenerContainerFactory() { // Ta nazwa też była w błędzie
+        ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(screeningCancelledEventConsumerFactoryTicket());
+        // TODO: Rozważ ErrorHandler + DLT
+        return factory;
+    }
+
 }

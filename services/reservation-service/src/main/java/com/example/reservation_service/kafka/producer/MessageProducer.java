@@ -1,6 +1,7 @@
 package com.example.reservation_service.kafka.producer;
 
 import org.example.commons.dto.ReservationDTO;
+import org.example.commons.dto.ScreeningChangeNotificationDTO;
 import org.example.commons.events.ReservationCancelledEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,12 +15,17 @@ public class MessageProducer {
     private static final String RESERVATION_TOPIC = "cinema.reservation";
     private static final String TICKET_TOPIC = "cinema.ticket.request";
     private static final String CANCEL_TOPIC = "cinema.cancel.reservation";
+    private static final String SCREENING_CHANGE_NOTIFICATION_TOPIC = "cinema.notification.screening_change";
     private final KafkaTemplate<String, ReservationDTO> kafkaTemplate;
     private final KafkaTemplate<String, ReservationCancelledEvent> cancelKafkaTemplate;
+    private final KafkaTemplate<String, ScreeningChangeNotificationDTO> screeningChangeNotificationKafkaTemplate; // Nowy template
 
-    public MessageProducer(KafkaTemplate<String, ReservationDTO> kafkaTemplate, KafkaTemplate<String, ReservationCancelledEvent> cancelKafkaTemplate) {
+    public MessageProducer(KafkaTemplate<String, ReservationDTO> kafkaTemplate,
+                           KafkaTemplate<String, ReservationCancelledEvent> cancelKafkaTemplate,
+                           KafkaTemplate<String, ScreeningChangeNotificationDTO> screeningChangeNotificationKafkaTemplate) { // Zaktualizuj konstruktor
         this.kafkaTemplate = kafkaTemplate;
         this.cancelKafkaTemplate = cancelKafkaTemplate;
+        this.screeningChangeNotificationKafkaTemplate = screeningChangeNotificationKafkaTemplate;
     }
 
     public void sendReservation(ReservationDTO reservation) {
@@ -35,5 +41,11 @@ public class MessageProducer {
     public void sendReservationCancelled(ReservationCancelledEvent event) {
         cancelKafkaTemplate.send(CANCEL_TOPIC, event);
         LOG.info("Sent cancellation: {} to topic: {}", event.getReservationId(), CANCEL_TOPIC);
+    }
+
+    public void sendScreeningChangeNotification(ScreeningChangeNotificationDTO payload) {
+        LOG.info("Sending ScreeningChangeNotification for reservation ID: {} (Screening ID: {})",
+                payload.getReservationId(), payload.getOriginalScreeningId());
+        screeningChangeNotificationKafkaTemplate.send(SCREENING_CHANGE_NOTIFICATION_TOPIC, payload);
     }
 }

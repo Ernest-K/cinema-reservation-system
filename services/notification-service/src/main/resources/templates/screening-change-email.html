@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Screening Update Notification</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { border: 1px solid #ddd; padding: 20px; max-width: 600px; margin: auto; }
+        .header { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #333; }
+        .ticket-info p { margin: 5px 0; }
+        .qr-code { text-align: center; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">Important Update Regarding Your Reservation</div>
+
+    <p>Dear <span th:text="${customerName}">Customer</span>,</p>
+
+    <div th:if="${changeType == 'CANCELLED'}">
+        <p>We regret to inform you that the screening for your reservation (ID: <span th:text="${reservationId}"></span>) has been <strong>CANCELLED</strong>.</p>
+        <p><strong>Movie:</strong> <span th:text="${movieTitle}">Movie Title</span></p>
+        <p><strong>Original Screening Time:</strong> <span th:text="${#temporals.format(oldScreeningTime, 'dd-MM-yyyy HH:mm')}">Date & Time</span></p>
+        <p><strong>Reason for cancellation:</strong> <span th:text="${changeReason}">Reason</span></p>
+        <p>We apologize for any inconvenience. Please contact our support for information regarding refunds or rebooking options.</p>
+    </div>
+
+    <div th:if="${changeType == 'UPDATED'}">
+        <p>Please note that there has been an update to the screening for your reservation (ID: <span th:text="${reservationId}"></span>).</p>
+        <p><strong>Movie:</strong> <span th:text="${movieTitle}">Movie Title</span></p>
+        <p><strong>Original Details:</strong></p>
+        <ul>
+            <li>Time: <span th:text="${#temporals.format(oldScreeningTime, 'dd-MM-yyyy HH:mm')}">Old Date & Time</span></li>
+            <li>Hall: <span th:text="${oldHallInfo}">Old Hall</span></li>
+        </ul>
+        <p><strong>New Details:</strong></p>
+        <ul>
+            <li>Time: <span th:text="${#temporals.format(newScreeningTime, 'dd-MM-yyyy HH:mm')}">New Date & Time</span></li>
+            <li>Hall: <span th:text="${newHallInfo}">New Hall</span></li>
+        </ul>
+        <p th:if="${changeReason != null}"><strong>Reason for update:</strong> <span th:text="${changeReason}">Reason</span></p>
+        <p>Your existing ticket for this reservation remains valid for the new screening details. If the new time is not suitable, please contact our support.</p>
+    </div>
+
+    <p>Best regards,<br/>Cinema Team</p>
+</div>
+</body>
+</html>

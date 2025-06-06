@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>Reservation Cancelled</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .container { border: 1px solid #ddd; padding: 20px; max-width: 600px; margin: auto; }
+        .header { font-size: 24px; font-weight: bold; margin-bottom: 20px; color: #d9534f; } /* Czerwony dla anulowania */
+        .info p { margin: 5px 0; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="header">Reservation Cancelled</div>
+
+    <p>Dear <span th:text="${customerName}">Customer</span>,</p>
+    <p>We are writing to confirm that your reservation has been successfully cancelled.</p>
+
+    <div class="info">
+        <p><strong>Reservation ID:</strong> <span th:text="${reservationId}">RES-ID</span></p>
+        <p><strong>Movie:</strong> <span th:text="${movieTitle}">Movie Title</span></p>
+        <p th:if="${screeningStartTime != null}"><strong>Original Screening Time:</strong> <span th:text="${#temporals.format(screeningStartTime, 'dd-MM-yyyy HH:mm')}">Date & Time</span></p>
+        <p th:if="${cancellationReason != null}"><strong>Reason:</strong> <span th:text="${cancellationReason}">Reason</span></p>
+    </div>
+
+    <p th:if="${cancellationReason != null && cancellationReason.contains('payment')}">
+        If you believe this cancellation was in error, or if you have questions regarding your payment, please contact our support.
+    </p>
+    <p>If you did not request this cancellation, please contact us immediately.</p>
+
+    <p>Thank you,<br/>Cinema Team</p>
+</div>
+</body>
+</html>

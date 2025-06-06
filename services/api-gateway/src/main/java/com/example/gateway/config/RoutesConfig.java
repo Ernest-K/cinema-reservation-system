@@ -12,7 +12,7 @@ public class RoutesConfig {
     public RouteLocator customRouteLocator(RouteLocatorBuilder builder) {
         return builder.routes()
             .route("movie-service", r -> r
-                .path("/api/movies/**")
+                .path("/api/movies/**", "/api/screenings/**")
                 .uri("lb://movie-service"))
             .route("reservation-service", r -> r
                     .path("/api/reservations/**")

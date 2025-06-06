@@ -4,9 +4,11 @@ import com.example.reservation_service.client.MovieServiceClient;
 import com.example.reservation_service.client.TicketServiceClient;
 import com.example.reservation_service.entity.Reservation;
 import com.example.reservation_service.entity.ReservedSeat;
+import com.example.reservation_service.entity.ScreeningInfo;
 import com.example.reservation_service.kafka.producer.MessageProducer;
 import com.example.reservation_service.repository.ReservationRepository;
 import com.example.reservation_service.repository.ReservedSeatRepository;
+import com.example.reservation_service.repository.ScreeningInfoRepository;
 import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import org.example.commons.enums.ReservationStatus;
 import org.example.commons.enums.TicketStatus;
 import org.example.commons.events.PaymentFailedEvent;
 import org.example.commons.events.ReservationCancelledEvent;
+import org.example.commons.events.ScreeningUpdatedEvent;
 import org.example.commons.events.TicketGenerationFailedEvent;
 import org.example.commons.exception.InvalidReservationStatusException;
 import org.example.commons.exception.ReservationConflictException;
@@ -29,6 +32,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -36,6 +40,7 @@ import java.util.stream.Collectors;
 public class ReservationService {
     private static final Logger LOG = LoggerFactory.getLogger(ReservationService.class);
     private final ReservationRepository reservationRepository;
+    private final ScreeningInfoRepository screeningInfoRepository;
     private final ReservedSeatRepository reservedSeatRepository;
     private final MovieServiceClient movieServiceClient;
     private final TicketServiceClient ticketServiceClient;
@@ -178,7 +183,9 @@ public class ReservationService {
             LOG.warn("Payment for reservation ID: {} was not completed (status: {}). Cancelling reservation.", reservation.getId(), paymentStatusDTO.getStatus());
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.CANCELLED);
-            messageProducer.sendReservationCancelled(new ReservationCancelledEvent(paymentStatusDTO.getReservationId()));
+
+            ReservationCancelledEvent event = mapReservationCancelledEvent(reservation, "PAYMENT_ERROR");
+            messageProducer.sendReservationCancelled(event);
         }
 
         reservationRepository.save(reservation);
@@ -225,7 +232,8 @@ public class ReservationService {
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.CANCELLED); // Oznacz jako anulowaną z powodu błędu
             reservationRepository.save(reservation);
-            messageProducer.sendReservationCancelled(new ReservationCancelledEvent(event.getReservationId()));
+            ReservationCancelledEvent cancelledEvent = mapReservationCancelledEvent(reservation, "TICKET_ERROR");
+            messageProducer.sendReservationCancelled(cancelledEvent);
         } else if (reservation.getStatus() != ReservationStatus.CANCELLED && reservation.getStatus() != ReservationStatus.EXPIRED) {
             LOG.warn("Ticket generation failed for reservation {} in status {}. Setting to CANCELLED.",
                     event.getReservationId(), reservation.getStatus());
@@ -233,7 +241,8 @@ public class ReservationService {
             reservation.getSeats().clear();
             reservation.setStatus(ReservationStatus.CANCELLED);
             reservationRepository.save(reservation);
-            messageProducer.sendReservationCancelled(new ReservationCancelledEvent(event.getReservationId()));
+            ReservationCancelledEvent cancelledEvent = mapReservationCancelledEvent(reservation, "TICKET_ERROR");
+            messageProducer.sendReservationCancelled(cancelledEvent);
         } else {
             LOG.info("Reservation {} already {}. No action needed for ticket generation failure.", event.getReservationId(), reservation.getStatus());
         }
@@ -285,12 +294,120 @@ public class ReservationService {
         }
 
         reservation.getSeats().clear();
-
         reservation.setStatus(ReservationStatus.CANCELLED);
         Reservation cancelledReservation = reservationRepository.save(reservation);
         LOG.info("Reservation ID: {} cancelled successfully.", cancelledReservation.getId());
 
-        messageProducer.sendReservationCancelled(new ReservationCancelledEvent(cancelledReservation.getId()));
+        ReservationCancelledEvent event = mapReservationCancelledEvent(reservation, "USER");
+        messageProducer.sendReservationCancelled(event);
+    }
+
+    @Transactional
+    public void handleScreeningCancellation(Long cancelledScreeningId, String reason) {
+        LOG.info("Handling cancellation of screening ID: {}. Reason: {}", cancelledScreeningId, reason);
+
+        // Pobierz szczegóły anulowanego seansu z lokalnej kopii
+        ScreeningInfo cancelledScreeningCopy = screeningInfoRepository.findById(cancelledScreeningId)
+                .orElse(null); // Lub rzuć wyjątek, jeśli kopia powinna istnieć
+
+        if (cancelledScreeningCopy == null) {
+            LOG.warn("ScreeningCopy not found for cancelledScreeningId: {}. Cannot send detailed notifications.", cancelledScreeningId);
+            // Można próbować pobrać z movie-service, ale to łamie zasadę niezależności
+        }
+
+        List<Reservation> affectedReservations = reservationRepository.findAllByScreeningIdAndStatusIn(
+                cancelledScreeningId,
+                List.of(ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED)
+        );
+
+        if (affectedReservations.isEmpty()) {
+            LOG.info("No active reservations found for cancelled screening ID: {}. No user notifications needed.", cancelledScreeningId);
+            return;
+        }
+
+        LOG.info("Found {} active reservations for cancelled screening ID: {}. Proceeding to cancel them and notify users.",
+                affectedReservations.size(), cancelledScreeningId);
+
+        for (Reservation reservation : affectedReservations) {
+            ReservationStatus oldStatus = reservation.getStatus();
+            reservation.setStatus(ReservationStatus.CANCELLED);
+            // Rozważ, czy usuwać `reservedSeats` - zależy od logiki biznesowej
+            // Jeśli nie usuwasz, upewnij się, że nigdzie nie są one traktowane jako aktywne
+            // List<ReservedSeat> seatsToClear = new ArrayList<>(reservation.getSeats());
+            // reservation.getSeats().clear();
+            // reservedSeatRepository.deleteAll(seatsToClear); // Jeśli cascade nie jest ustawiony lub chcesz być jawny
+
+            reservationRepository.save(reservation);
+            LOG.info("Reservation ID: {} (for screening ID: {}) status changed from {} to CANCELLED due to screening cancellation.",
+                    reservation.getId(), cancelledScreeningId, oldStatus);
+
+            // Publikuj event o anulowaniu rezerwacji dla innych serwisów (Payment, Ticket)
+            ReservationCancelledEvent event = mapReservationCancelledEvent(reservation, "CANCELED_SCREENING");
+            messageProducer.sendReservationCancelled(event);
+
+            // Przygotuj i wyślij powiadomienie do użytkownika
+            if (cancelledScreeningCopy != null) {
+                ScreeningChangeNotificationDTO notificationPayload = ScreeningChangeNotificationDTO.builder()
+                        .customerEmail(reservation.getCustomerEmail())
+                        .customerName(reservation.getCustomerName())
+                        .movieTitle(cancelledScreeningCopy.getMovieTitle()) // Z kopii seansu
+                        .reservationId(reservation.getId())
+                        .originalScreeningId(cancelledScreeningId)
+                        .changeType("CANCELLED")
+                        .changeReason(reason)
+                        .oldScreeningTime(cancelledScreeningCopy.getStartTime()) // Z kopii seansu
+                        .oldHallInfo("Hall " + cancelledScreeningCopy.getHallNumber()) // Z kopii seansu
+                        .build();
+                messageProducer.sendScreeningChangeNotification(notificationPayload); // Nowa metoda w MessageProducer
+            } else {
+                // Uproszczone powiadomienie, jeśli nie ma szczegółów seansu
+                ScreeningChangeNotificationDTO notificationPayload = ScreeningChangeNotificationDTO.builder()
+                        .customerEmail(reservation.getCustomerEmail())
+                        .customerName(reservation.getCustomerName())
+                        .reservationId(reservation.getId())
+                        .originalScreeningId(cancelledScreeningId)
+                        .changeType("CANCELLED")
+                        .changeReason("The screening for your reservation has been cancelled. Please contact support for more details.")
+                        .build();
+                messageProducer.sendScreeningChangeNotification(notificationPayload);
+            }
+        }
+    }
+
+    @Transactional
+    public void handleScreeningUpdate(ScreeningUpdatedEvent event, ScreeningInfo oldScreeningInfo) {
+        LOG.info("Handling update of screening ID: {}.", event.getScreeningId());
+        ScreeningDTO updatedDetails = event.getUpdatedScreeningDTO();
+
+        List<Reservation> affectedReservations = reservationRepository.findAllByScreeningIdAndStatusIn(
+                event.getScreeningId(),
+                List.of(ReservationStatus.PENDING_PAYMENT, ReservationStatus.CONFIRMED) // Tylko aktywne rezerwacje
+        );
+
+        if (affectedReservations.isEmpty()) {
+            LOG.info("No active reservations found for updated screening ID: {}. No user notifications needed for update.", event.getScreeningId());
+            return;
+        }
+
+        LOG.info("Found {} active reservations for updated screening ID: {}. Notifying users.",
+                affectedReservations.size(), event.getScreeningId());
+
+        for (Reservation reservation : affectedReservations) {
+            ScreeningChangeNotificationDTO notificationPayload = ScreeningChangeNotificationDTO.builder()
+                    .customerEmail(reservation.getCustomerEmail())
+                    .customerName(reservation.getCustomerName())
+                    .movieTitle(updatedDetails.getMovieDTO().getTitle()) // Nowy tytuł filmu
+                    .reservationId(reservation.getId())
+                    .originalScreeningId(event.getScreeningId())
+                    .changeType("UPDATED")
+                    .changeReason("The screening details have been updated.") // Można dodać bardziej szczegółowy powód
+                    .oldScreeningTime(oldScreeningInfo.getStartTime())
+                    .oldHallInfo("Hall " + oldScreeningInfo.getHallNumber())
+                    .newScreeningTime(updatedDetails.getStartTime())
+                    .newHallInfo("Hall " + updatedDetails.getHallDTO().getNumber())
+                    .build();
+            messageProducer.sendScreeningChangeNotification(notificationPayload);
+        }
     }
 
     private SeatDTO mapToSeatDTO(ReservedSeat reservedSeat) {
@@ -330,5 +447,20 @@ public class ReservationService {
         ReservationDTO reservationDTO = mapToReservationDTO(reservation, screening, seats);
         messageProducer.sendTicketRequest(reservationDTO);
         LOG.info("Ticket generation request sent for reservation ID: {}", reservation.getId());
+    }
+
+    public ReservationCancelledEvent mapReservationCancelledEvent(Reservation reservation, String reason) {
+        Optional<ScreeningInfo> screeningDetails = screeningInfoRepository.findById(reservation.getScreeningId());
+        if (screeningDetails.isEmpty()) {
+            LOG.error("Could not fetch screening details for reservation {} during cancellation event creation. Event will have partial data.", reservation.getId());
+        }
+        return ReservationCancelledEvent.builder()
+                .reservationId(reservation.getId())
+                .customerEmail(reservation.getCustomerEmail())
+                .customerName(reservation.getCustomerName())
+                .movieTitle(screeningDetails.map(ScreeningInfo::getMovieTitle).orElse("N/A"))
+                .screeningStartTime(screeningDetails.map(ScreeningInfo::getStartTime).orElse(null))
+                .cancellationReason(reason)
+                .build();
     }
 }

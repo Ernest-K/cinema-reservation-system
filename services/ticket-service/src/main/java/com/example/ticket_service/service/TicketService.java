@@ -239,6 +239,67 @@ public class TicketService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public byte[] getQrCodeImageByEmailAndReservationId(String email, Long reservationId)
+            throws IOException, WriterException {
+
+        if (email == null || email.isBlank() || reservationId == null || reservationId <= 0) {
+            throw new IllegalArgumentException("Invalid email or reservation ID.");
+        }
+
+        Ticket ticket = ticketRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket for reservation ID " + reservationId + " not found."));
+
+        if (!ticket.getCustomerEmail().equalsIgnoreCase(email.trim())) {
+            throw new ResourceNotFoundException("No ticket found for the provided email and reservation ID.");
+        }
+
+        if (ticket.getQrCodeData() == null || ticket.getQrCodeData().isEmpty()) {
+            throw new IllegalStateException("QR code data is missing for ticket with reservation ID " + reservationId);
+        }
+
+        return qrCodeGeneratorService.generateQrCodeImage(ticket.getQrCodeData(), 500, 500);
+    }
+
+    @Transactional(readOnly = true)
+    public void resendTicketToEmail(String email, Long reservationId) {
+        LOG.info("Resending ticket for reservation ID: {} to email: {}", reservationId, email);
+
+        Ticket ticket = ticketRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket for reservation ID " + reservationId + " not found."));
+
+        if (!ticket.getCustomerEmail().equalsIgnoreCase(email)) {
+            LOG.warn("Provided email '{}' does not match ticket email '{}'", email, ticket.getCustomerEmail());
+            throw new TicketValidationException("Provided email does not match the ticket's email.");
+        }
+
+        try {
+            TicketDTO ticketDTO = mapToTicketDTO(ticket);
+            producer.send(ticketDTO);
+            LOG.info("Ticket for reservation ID: {} resent to Kafka for email: {}", reservationId, email);
+        } catch (Exception e) {
+            LOG.error("Failed to resend ticket to Kafka: {}", e.getMessage(), e);
+            throw new TicketGenerationException("Failed to resend ticket to email: " + email, e);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void resendTicketByEmail(String email) {
+        LOG.info("Attempting to resend ticket to email: {}", email);
+
+        Ticket ticket = ticketRepository.findTopByCustomerEmailIgnoreCaseOrderByCreatedAtDesc(email)
+                .orElseThrow(() -> new ResourceNotFoundException("No ticket found for email: " + email));
+
+        try {
+            TicketDTO ticketDTO = mapToTicketDTO(ticket);
+            producer.send(ticketDTO);
+            LOG.info("Ticket resent to Kafka for email: {}", email);
+        } catch (Exception e) {
+            LOG.error("Error resending ticket to email {}: {}", email, e.getMessage(), e);
+            throw new TicketGenerationException("Could not resend ticket to email: " + email, e);
+        }
+    }
+
     private TicketDTO mapToTicketDTO(Ticket ticket) {
         return TicketDTO.builder()
                 .id(ticket.getId())

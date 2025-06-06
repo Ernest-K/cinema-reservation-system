@@ -1,6 +1,7 @@
 package com.example.reservation_service.kafka.producer;
 
 import org.example.commons.dto.ReservationDTO;
+import org.example.commons.dto.ScreeningChangeNotificationDTO;
 import org.example.commons.events.ReservationCancelledEvent;
 
 import org.apache.kafka.clients.producer.ProducerConfig;
@@ -48,5 +49,19 @@ public class KafkaProducerConfig {
     @Bean
     public KafkaTemplate<String, ReservationCancelledEvent> cancelKafkaTemplate() {
         return new KafkaTemplate<>(cancelProducerFactory());
+    }
+
+    @Bean
+    public ProducerFactory<String, ScreeningChangeNotificationDTO> screeningChangeNotificationProducerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    public KafkaTemplate<String, ScreeningChangeNotificationDTO> screeningChangeNotificationKafkaTemplate() {
+        return new KafkaTemplate<>(screeningChangeNotificationProducerFactory());
     }
 }

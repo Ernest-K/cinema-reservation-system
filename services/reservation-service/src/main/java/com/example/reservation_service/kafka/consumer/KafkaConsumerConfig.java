@@ -1,8 +1,7 @@
 package com.example.reservation_service.kafka.consumer;
 
 import org.example.commons.dto.PaymentStatusDTO;
-import org.example.commons.events.PaymentFailedEvent;
-import org.example.commons.events.TicketGenerationFailedEvent;
+import org.example.commons.events.*;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.common.serialization.StringDeserializer;
 import org.springframework.beans.factory.annotation.Value;
@@ -79,6 +78,67 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> paymentFailedKafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, PaymentFailedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(paymentFailedConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, ScreeningCreatedEvent> screeningCreatedEventConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-reservation"); // Lub dedykowana grupa np. "reservation-screening-events-group"
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*,java.util,java.time,java.math"); // Pozwól na dto i eventy z commons
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ScreeningCreatedEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ScreeningCreatedEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ScreeningCreatedEvent> screeningCreatedEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, ScreeningCreatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(screeningCreatedEventConsumerFactory());
+        // TODO: Rozważ dodanie ErrorHandler i DLT
+        return factory;
+    }
+
+    // Dla ScreeningUpdatedEvent
+    @Bean
+    public ConsumerFactory<String, ScreeningUpdatedEvent> screeningUpdatedEventConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-reservation");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*,java.util,java.time,java.math");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ScreeningUpdatedEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ScreeningUpdatedEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> screeningUpdatedEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(screeningUpdatedEventConsumerFactory());
+        // TODO: Rozważ dodanie ErrorHandler i DLT
+        return factory;
+    }
+
+    // Dla ScreeningCancelledEvent
+    @Bean
+    public ConsumerFactory<String, ScreeningCancelledEvent> screeningCancelledEventConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-reservation");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.ScreeningCancelledEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(ScreeningCancelledEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> screeningCancelledEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(screeningCancelledEventConsumerFactory());
+        // TODO: Rozważ dodanie ErrorHandler i DLT
         return factory;
     }
 }

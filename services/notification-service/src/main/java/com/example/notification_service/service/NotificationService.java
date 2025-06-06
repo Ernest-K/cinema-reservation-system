@@ -4,8 +4,10 @@ import com.example.notification_service.entity.Notification;
 import com.example.notification_service.repository.NotificationRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.dto.ScreeningChangeNotificationDTO;
 import org.example.commons.dto.TicketDTO;
 import org.example.commons.enums.NotificationStatus;
+import org.example.commons.events.ReservationCancelledEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -45,6 +47,98 @@ public class NotificationService {
     private static final int QR_CODE_HEIGHT = 250;
     private static final String QR_IMAGE_RESOURCE_NAME = "ticketQrCode";
     private static final String NOTIFICATION_TYPE_TICKET_CONFIRMATION = "TICKET_CONFIRMATION_EMAIL";
+    private static final String NOTIFICATION_TYPE_SCREENING_CHANGE = "SCREENING_CHANGE_EMAIL";
+    private static final String NOTIFICATION_TYPE_RESERVATION_CANCELLED = "RESERVATION_CANCELLED_EMAIL";
+
+    public void processAndSendScreeningChangeNotification(ScreeningChangeNotificationDTO payload) {
+        Notification log = createInitialLogForScreeningChange(payload);
+        try {
+            sendScreeningChangeEmailWithRetry(payload, log);
+            updateNotificationStatus(log, NotificationStatus.SENT, null);
+        } catch (Exception e) {
+            LOG.error("Exception after attempting to send screening change email for reservation ID {}: {}", payload.getReservationId(), e.getMessage());
+            if (log.getStatus() != NotificationStatus.FAILED_FINAL && log.getStatus() != NotificationStatus.FAILED_RETRY) {
+                updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, e.getMessage());
+            }
+        }
+    }
+
+    @Retryable(
+            retryFor = {MailException.class, MessagingException.class},
+            maxAttemptsExpression = "${app.mail.retry.max-attempts:3}",
+            backoff = @Backoff(delayExpression = "${app.mail.retry.delay:2000}", multiplierExpression = "${app.mail.retry.multiplier:2}")
+    )
+    public void sendScreeningChangeEmailWithRetry(ScreeningChangeNotificationDTO payload, Notification log)
+            throws MailException, MessagingException {
+        RetryContext retryContext = RetrySynchronizationManager.getContext();
+        int currentAttempt = retryContext != null ? retryContext.getRetryCount() + 1 : 1;
+
+        LOG.info("Attempting to send screening change notification to: {} for reservation ID: {} (Attempt: {})",
+                payload.getCustomerEmail(), payload.getReservationId(), currentAttempt);
+
+        log.setAttemptCount(currentAttempt);
+        log.setLastAttemptAt(LocalDateTime.now());
+        log.setStatus(currentAttempt > 1 ? NotificationStatus.FAILED_RETRY : NotificationStatus.PENDING);
+        notificationRepository.save(log);
+
+        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, StandardCharsets.UTF_8.name()); // Prostszy helper, bez obrazków
+
+        Context context = new Context();
+        context.setVariable("customerName", payload.getCustomerName());
+        context.setVariable("movieTitle", payload.getMovieTitle());
+        context.setVariable("reservationId", payload.getReservationId());
+        context.setVariable("changeType", payload.getChangeType());
+        context.setVariable("changeReason", payload.getChangeReason());
+        context.setVariable("oldScreeningTime", payload.getOldScreeningTime());
+        context.setVariable("oldHallInfo", payload.getOldHallInfo());
+        if ("UPDATED".equals(payload.getChangeType())) {
+            context.setVariable("newScreeningTime", payload.getNewScreeningTime());
+            context.setVariable("newHallInfo", payload.getNewHallInfo());
+        }
+
+        String htmlContent = templateEngine.process("screening-change-email", context);
+
+        helper.setTo(payload.getCustomerEmail());
+        helper.setFrom(senderEmail);
+        helper.setSubject("Important Update Regarding Your Reservation for " + payload.getMovieTitle());
+        helper.setText(htmlContent, true);
+
+        javaMailSender.send(mimeMessage);
+        LOG.info("Screening change notification email sent successfully to: {} for reservation ID: {}",
+                payload.getCustomerEmail(), payload.getReservationId());
+    }
+
+    // Metody @Recover dla ScreeningChangeNotificationDTO
+    @Recover
+    public void recoverScreeningChangeEmail(MailException e, ScreeningChangeNotificationDTO payload, Notification log) {
+        LOG.error("Failed to send screening change notification to {} for reservation ID {} after all retries. Error: {}",
+                payload.getCustomerEmail(), payload.getReservationId(), e.getMessage());
+        updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, e.getClass().getSimpleName() + ": " + e.getMessage());
+    }
+
+    @Recover
+    public void recoverScreeningChangeEmail(MessagingException e, ScreeningChangeNotificationDTO payload, Notification log) {
+        LOG.error("Failed to send screening change notification to {} for reservation ID {} after all retries (MessagingException). Error: {}",
+                payload.getCustomerEmail(), payload.getReservationId(), e.getMessage());
+        updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, "MessagingException: " + e.getMessage());
+    }
+
+    @Transactional
+    public Notification createInitialLogForScreeningChange(ScreeningChangeNotificationDTO payload) {
+        Notification log = Notification.builder()
+                .reservationId(payload.getReservationId()) // Kluczowe ID
+                .ticketId(null) // Nie dotyczy konkretnego biletu, a rezerwacji i zmiany seansu
+                .customerEmail(payload.getCustomerEmail())
+                .status(NotificationStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .lastAttemptAt(LocalDateTime.now())
+                .attemptCount(0)
+                .notificationType(NOTIFICATION_TYPE_SCREENING_CHANGE)
+                .lastErrorMessage("Change Type: " + payload.getChangeType() + ", Screening: " + payload.getOriginalScreeningId()) // Dodatkowe info
+                .build();
+        return notificationRepository.save(log);
+    }
 
     public void processAndSendTicketNotification(TicketDTO ticketDTO) {
         // Sprawdzenie idempotentności na podstawie logu
@@ -184,5 +278,107 @@ public class NotificationService {
         }
         log.setLastAttemptAt(LocalDateTime.now());
         notificationRepository.save(log);
+    }
+
+    public void processAndSendReservationCancelledNotification(ReservationCancelledEvent event) {
+        if (notificationRepository.findByReservationIdAndNotificationType(event.getReservationId(), NOTIFICATION_TYPE_RESERVATION_CANCELLED)
+                .filter(log -> log.getStatus() == NotificationStatus.SENT)
+                .isPresent()) {
+            LOG.warn("Cancellation notification for reservation ID {} (type {}) already sent. Skipping.",
+                    event.getReservationId(), NOTIFICATION_TYPE_RESERVATION_CANCELLED);
+            return;
+        }
+
+        Notification log = createInitialLogForCancellation(event);
+        try {
+            sendReservationCancelledEmailWithRetry(event, log);
+            updateNotificationStatus(log, NotificationStatus.SENT, null);
+        } catch (Exception e) {
+            LOG.error("Exception after attempting to send cancellation email for reservation ID {}: {}",
+                    event.getReservationId(), e.getMessage());
+            if (log.getStatus() != NotificationStatus.FAILED_FINAL && log.getStatus() != NotificationStatus.FAILED_RETRY) {
+                updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, e.getMessage());
+            }
+        }
+    }
+
+    @Transactional
+    public Notification createInitialLogForCancellation(ReservationCancelledEvent event) {
+        Notification log = Notification.builder()
+                .reservationId(event.getReservationId())
+                .ticketId(null)
+                .customerEmail(event.getCustomerEmail())
+                .status(NotificationStatus.PENDING)
+                .createdAt(LocalDateTime.now())
+                .lastAttemptAt(LocalDateTime.now())
+                .attemptCount(0)
+                .notificationType(NOTIFICATION_TYPE_RESERVATION_CANCELLED)
+                .build();
+        return notificationRepository.save(log);
+    }
+
+    @Transactional
+    public void logSkippedCancellationNotification(ReservationCancelledEvent event, String reason) {
+        if (notificationRepository.findByReservationIdAndNotificationType(event.getReservationId(), NOTIFICATION_TYPE_RESERVATION_CANCELLED).isEmpty()) {
+            Notification log = Notification.builder()
+                    .reservationId(event.getReservationId())
+                    .customerEmail(event.getCustomerEmail())
+                    .status(NotificationStatus.SKIPPED)
+                    .createdAt(LocalDateTime.now())
+                    .lastAttemptAt(LocalDateTime.now())
+                    .attemptCount(0)
+                    .lastErrorMessage(reason)
+                    .notificationType(NOTIFICATION_TYPE_RESERVATION_CANCELLED)
+                    .build();
+            notificationRepository.save(log);
+            LOG.info("Logged SKIPPED cancellation notification for reservation ID: {}", event.getReservationId());
+        }
+    }
+
+
+    @Retryable( /* ... jak poprzednio ... */ )
+    public void sendReservationCancelledEmailWithRetry(ReservationCancelledEvent event, Notification log)
+            throws MailException, MessagingException {
+        // ... (logika pobierania currentAttempt, aktualizacji logu) ...
+
+        // Sprawdź, czy email istnieje, chociaż konsumer już to powinien zrobić
+        if (event.getCustomerEmail() == null || event.getCustomerEmail().isEmpty()) {
+            updateNotificationStatus(log, NotificationStatus.SKIPPED, "Customer email is missing for cancellation.");
+            throw new IllegalArgumentException("Customer email is missing for cancellation notification.");
+        }
+
+        MimeMessage mimeMessage = javaMailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, StandardCharsets.UTF_8.name());
+
+        Context context = new Context();
+        context.setVariable("customerName", event.getCustomerName()); // Użyj pola z eventu
+        context.setVariable("reservationId", event.getReservationId());
+        context.setVariable("movieTitle", event.getMovieTitle());
+        context.setVariable("screeningStartTime", event.getScreeningStartTime());
+        context.setVariable("cancellationReason", event.getCancellationReason());
+
+        String htmlContent = templateEngine.process("reservation-cancelled-email", context); // Ten sam szablon
+
+        helper.setTo(event.getCustomerEmail());
+        helper.setFrom(senderEmail);
+        helper.setSubject("Confirmation of Your Reservation Cancellation (ID: " + event.getReservationId() + ")");
+        helper.setText(htmlContent, true);
+
+        javaMailSender.send(mimeMessage);
+        LOG.info("Reservation cancellation email sent (attempt {}) to: {} for reservation ID: {}",
+                log.getAttemptCount(), event.getCustomerEmail(), event.getReservationId());
+    }
+
+    @Recover
+    public void recoverCancellationEmailSending(MailException e, ReservationCancelledEvent event, Notification log) {
+        LOG.error("Failed to send reservation cancellation email to {} for reservation ID {} after all retries. Final Error: {}",
+                event.getCustomerEmail(), event.getReservationId(), e.getMessage());
+        updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, e.getClass().getSimpleName() + ": " + e.getMessage());
+    }
+    @Recover
+    public void recoverCancellationEmailSending(MessagingException e, ReservationCancelledEvent event, Notification log) {
+        LOG.error("Failed to send reservation cancellation email to {} for reservation ID {} after all retries. Final Error: {}",
+                event.getCustomerEmail(), event.getReservationId(), e.getMessage());
+        updateNotificationStatus(log, NotificationStatus.FAILED_FINAL, "MessagingException: " + e.getMessage());
     }
 }

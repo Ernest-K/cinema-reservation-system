@@ -3,7 +3,7 @@ package com.example.movie_service.config;
 import com.example.movie_service.entity.Hall;
 import com.example.movie_service.entity.Movie;
 import com.example.movie_service.entity.Screening;
-import com.example.movie_service.repository.HallRespository;
+import com.example.movie_service.repository.HallRepository;
 import com.example.movie_service.repository.MovieRepository;
 import com.example.movie_service.repository.ScreeningRepository;
 import jakarta.annotation.PostConstruct;
@@ -20,7 +20,7 @@ import java.util.List;
 public class DataInitializer {
 
     private final MovieRepository movieRepository;
-    private final HallRespository hallRespository;
+    private final HallRepository hallRepository;
     private final ScreeningRepository screeningRepository;
 
     @PostConstruct
@@ -39,14 +39,14 @@ public class DataInitializer {
             movieRepository.saveAll(movies);
         }
 
-        if (hallRespository.count() == 0) {
+        if (hallRepository.count() == 0) {
             halls = List.of(
                     new Hall(1, 10, 15),
                     new Hall(2, 10, 15),
                     new Hall(3, 10, 15)
             );
 
-            hallRespository.saveAll(halls);
+            hallRepository.saveAll(halls);
         }
 
         if (screeningRepository.count() == 0) {

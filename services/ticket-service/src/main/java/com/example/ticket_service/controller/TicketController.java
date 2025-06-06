@@ -64,4 +64,43 @@ public class TicketController {
             throw new RuntimeException("Failed to generate QR code image for ticket " + ticketId, e);
         }
     }
+
+    @GetMapping(value = "/qr-code", produces = MediaType.IMAGE_PNG_VALUE)
+    public ResponseEntity<byte[]> getTicketQrCodeByEmailAndReservationId(
+            @RequestParam("email") String email,
+            @RequestParam("reservationId") Long reservationId) {
+
+        try {
+            byte[] qrImageBytes = ticketService.getQrCodeImageByEmailAndReservationId(email, reservationId);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentLength(qrImageBytes.length);
+
+            ContentDisposition contentDisposition = ContentDisposition.builder("inline")
+                    .filename("qr_ticket_" + reservationId + ".png")
+                    .build();
+            headers.setContentDisposition(contentDisposition);
+
+            return new ResponseEntity<>(qrImageBytes, headers, HttpStatus.OK);
+
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(null);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate QR code image for reservation ID " + reservationId, e);
+        }
+    }
+
+    @PostMapping("/resend")
+    public ResponseEntity<String> resendTicketToEmail(@RequestParam("email") String email,
+                                                      @RequestParam("reservationId") Long reservationId) {
+        ticketService.resendTicketToEmail(email, reservationId);
+        return ResponseEntity.ok("Ticket has been resent to email: " + email);
+    }
+
+    @PostMapping("/resend-by-email")
+    public ResponseEntity<String> resendTicketByEmail(@RequestParam("email") String email) {
+        ticketService.resendTicketByEmail(email);
+        return ResponseEntity.ok("Ticket has been resent to: " + email);
+    }
+
 }
