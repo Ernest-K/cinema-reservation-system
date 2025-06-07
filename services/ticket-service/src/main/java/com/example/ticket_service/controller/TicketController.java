@@ -1,5 +1,7 @@
 package com.example.ticket_service.controller;
 
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import org.example.commons.dto.TicketDTO;
@@ -10,7 +12,6 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
-
 
 @RestController
 @RequestMapping("/api/tickets")
@@ -90,17 +91,40 @@ public class TicketController {
         }
     }
 
-    @PostMapping("/resend")
-    public ResponseEntity<String> resendTicketToEmail(@RequestParam("email") String email,
-                                                      @RequestParam("reservationId") Long reservationId) {
-        ticketService.resendTicketToEmail(email, reservationId);
-        return ResponseEntity.ok("Ticket has been resent to email: " + email);
+//    @PostMapping("/resend")
+//    public ResponseEntity<String> resendTicketToEmail(@RequestParam("email") String email,
+//                                                      @RequestParam("reservationId") Long reservationId) {
+//        ticketService.resendTicketToEmail(email, reservationId);
+//        return ResponseEntity.ok("Ticket has been resent to email: " + email);
+//    }
+
+    @PostMapping(value = "/regenerate", produces = MediaType.IMAGE_PNG_VALUE) // Nowa lub zmieniona ścieżka
+    public ResponseEntity<byte[]> regenerateTicketAndGetQr(
+            @RequestParam("email") @NotBlank @Email(message = "Valid email is required.") String email,
+            @RequestParam("reservationId") @NotNull @Positive(message = "Reservation ID must be positive.") Long reservationId
+    ) throws IOException, WriterException {
+        // GlobalExceptionHandler obsłuży wyjątki
+        byte[] qrImageBytes = ticketService.regenerateTicketAndGetQr(email, reservationId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentLength(qrImageBytes.length);
+        ContentDisposition contentDisposition = ContentDisposition.builder("inline")
+                .filename("regenerated_qr_ticket_reservation_" + reservationId + ".png")
+                .build();
+        headers.setContentDisposition(contentDisposition);
+
+        return new ResponseEntity<>(qrImageBytes, headers, HttpStatus.OK);
     }
 
     @PostMapping("/resend-by-email")
     public ResponseEntity<String> resendTicketByEmail(@RequestParam("email") String email) {
         ticketService.resendTicketByEmail(email);
         return ResponseEntity.ok("Ticket has been resent to: " + email);
+    }
+
+    @GetMapping("/uuid/{ticketUuid}")
+    public TicketDTO getTicketByTicketUuid(@PathVariable String ticketUuid) {
+        return ticketService.getTicketByUuid(ticketUuid); // Musisz dodać metodę getTicketByUuid do TicketService
     }
 
 }

@@ -13,12 +13,17 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @Entity
-@Table(name = "tickets")
+@Table(name = "tickets", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"ticketUuid"})
+})
 public class Ticket {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(nullable = false, unique = true)
+    private String ticketUuid;
 
     private Long reservationId;
     private Long screeningId;
@@ -47,4 +52,11 @@ public class Ticket {
 
     @Enumerated(EnumType.STRING)
     private TicketStatus status;
+
+    @PrePersist
+    public void prePersist() {
+        if (this.ticketUuid == null) {
+            this.ticketUuid = UUID.randomUUID().toString();
+        }
+    }
 }

@@ -143,8 +143,8 @@ public class NotificationService {
     public void processAndSendTicketNotification(TicketDTO ticketDTO) {
         // Sprawdzenie idempotentności na podstawie logu
         // To proste sprawdzenie, można je rozbudować (np. status != SENT)
-        if (notificationRepository.findByTicketIdAndNotificationType(ticketDTO.getId(), NOTIFICATION_TYPE_TICKET_CONFIRMATION)
-                .filter(log -> log.getStatus() == NotificationStatus.SENT || log.getStatus() == NotificationStatus.PENDING && log.getAttemptCount() > 0) // Jeśli PENDING i już próbowano, to @Retryable działa
+        if (notificationRepository.findTopByTicketIdAndNotificationTypeOrderByCreatedAtDesc(ticketDTO.getId(), NOTIFICATION_TYPE_TICKET_CONFIRMATION)
+                .filter(log -> log.getStatus() == NotificationStatus.PENDING && log.getAttemptCount() > 0) // Jeśli PENDING i już próbowano, to @Retryable działa
                 .isPresent()) {
             LOG.warn("Notification for ticket ID {} of type {} already processed or in progress. Skipping.", ticketDTO.getId(), NOTIFICATION_TYPE_TICKET_CONFIRMATION);
             return;
@@ -224,6 +224,7 @@ public class NotificationService {
         context.setVariable("seatsInfo", ticketDTO.getSeatsDescription());
         context.setVariable("reservationId", ticketDTO.getReservationId());
         context.setVariable("qrImageResourceName", QR_IMAGE_RESOURCE_NAME);
+        context.setVariable("ticketUuid", ticketDTO.getTicketUuid());
 
         String htmlContent = templateEngine.process("ticket-email", context);
 

@@ -29,7 +29,7 @@ public class QrCodeGeneratorService {
     public QrCodeGeneratorService() {
         this.objectMapper = new ObjectMapper();
         // Ważne dla poprawnej serializacji LocalDateTime do JSON
-        this.objectMapper.registerModule(new JavaTimeModule());
+//        this.objectMapper.registerModule(new JavaTimeModule());
     }
 
     /**

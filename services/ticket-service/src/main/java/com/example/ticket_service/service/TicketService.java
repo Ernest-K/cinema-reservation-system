@@ -23,6 +23,7 @@ import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -88,9 +89,9 @@ public class TicketService {
                 .status(TicketStatus.VALID)
                 .build();
 
-        Ticket savedTicketWithId;
+        Ticket savedTicketWithUuid;
         try {
-            savedTicketWithId = ticketRepository.saveAndFlush(ticket);
+            savedTicketWithUuid = ticketRepository.saveAndFlush(ticket);
         } catch (DataIntegrityViolationException e) {
             LOG.error("Data integrity violation while saving ticket for reservation ID {}: {}. This might indicate a race condition or a duplicate reservation ID constraint.",
                     reservationDTO.getId(), e.getMessage(), e);
@@ -107,30 +108,23 @@ public class TicketService {
                 .map(seat -> "Row " + seat.getRowNumber() + ", Seat " + seat.getSeatNumber())
                 .collect(Collectors.toList());
 
-        QrCodePayloadDTO qrPayload = new QrCodePayloadDTO(
-                savedTicketWithId.getId(),
-                reservationDTO.getId(),
-                screening.getMovieDTO().getTitle(),
-                screening.getStartTime(),
-                "Hall " + screening.getHallDTO().getNumber(),
-                seatsInfoListForQr,
-                reservationDTO.getCustomerName(),
-                reservationDTO.getSeats().size()
-        );
+        QrCodePayloadDTO qrPayload = QrCodePayloadDTO.builder()
+                .ticketUuid(savedTicketWithUuid.getTicketUuid())
+                .build();
 
         String qrCodeText;
         try {
             qrCodeText = qrCodeGeneratorService.generateQrCodeText(qrPayload);
         } catch (RuntimeException e) {
-            LOG.error("Failed to generate QR code text for ticket ID {}: {}", savedTicketWithId.getId(), e.getMessage(), e);
+            LOG.error("Failed to generate QR code text for ticket ID {}: {}", savedTicketWithUuid.getId(), e.getMessage(), e);
             producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "QR code text generation failed."));
-            throw new TicketGenerationException("Failed to generate QR code text for ticket " + savedTicketWithId.getId(), e);
+            throw new TicketGenerationException("Failed to generate QR code text for ticket " + savedTicketWithUuid.getId(), e);
         }
 
-        savedTicketWithId.setQrCodeData(qrCodeText);
+        savedTicketWithUuid.setQrCodeData(qrCodeText);
         Ticket finalTicket;
         try {
-            finalTicket = ticketRepository.save(savedTicketWithId);
+            finalTicket = ticketRepository.save(savedTicketWithUuid);
         } catch (Exception e) {
             LOG.error("Error saving ticket with QR code data for reservation ID {}: {}", reservationDTO.getId(), e.getMessage(), e);
             producer.sendTicketGenerationFailed(new TicketGenerationFailedEvent(reservationDTO.getId(), "Database error saving ticket with QR code."));
@@ -300,9 +294,107 @@ public class TicketService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public TicketDTO getTicketByUuid(String ticketUuid) {
+        LOG.debug("Fetching ticket by UUID: {}", ticketUuid);
+        Ticket ticket = ticketRepository.findByTicketUuid(ticketUuid) // Musisz dodać tę metodę do repozytorium
+                .orElseThrow(() -> new ResourceNotFoundException("Ticket with UUID " + ticketUuid + " not found."));
+        return mapToTicketDTO(ticket);
+    }
+
+    @Transactional // Ta operacja modyfikuje encję Ticket
+    public byte[] regenerateTicketAndGetQr(String email, Long reservationId) throws IOException, WriterException {
+        LOG.info("Request to REGENERATE ticket and get QR for reservation ID: {} and email: {}", reservationId, email);
+
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email cannot be blank for regenerating ticket.");
+        }
+        if (reservationId == null || reservationId <= 0) {
+            throw new IllegalArgumentException("Reservation ID must be a positive number for regenerating ticket.");
+        }
+
+        Ticket ticket = ticketRepository.findByReservationId(reservationId)
+                .orElseThrow(() -> new ResourceNotFoundException("No ticket found for reservation ID: " + reservationId + " to regenerate."));
+
+        if (!ticket.getCustomerEmail().equalsIgnoreCase(email.trim())) {
+            LOG.warn("Attempt to regenerate ticket for reservation ID: {} with incorrect email. Expected: {}, Provided: {}",
+                    reservationId, ticket.getCustomerEmail(), email);
+            throw new TicketValidationException("Provided email does not match the email associated with the reservation's ticket.");
+        }
+
+        // Sprawdź statusy, dla których regeneracja jest dozwolona
+        if (ticket.getStatus() == TicketStatus.CANCELLED) {
+            LOG.warn("Attempt to regenerate a CANCELLED ticket for reservation ID: {}", reservationId);
+            throw new TicketValidationException("Ticket for reservation " + reservationId + " is CANCELLED and cannot be regenerated.");
+        }
+        if (ticket.getStatus() == TicketStatus.USED) {
+            LOG.warn("Attempt to regenerate an already USED ticket for reservation ID: {}. This might be a security concern or require special handling.", reservationId);
+            // TODO: Decyzja biznesowa - czy pozwalać na regenerację użytego biletu?
+            // Jeśli tak, stary UUID nadal pozwolił na wejście. Nowy UUID może być mylący.
+            // Można rzucić wyjątek:
+            // throw new TicketValidationException("Ticket for reservation " + reservationId + " has already been USED and cannot be regenerated.");
+        }
+
+        // Krok 1: Wygeneruj nowy UUID dla biletu
+        String oldUuid = ticket.getTicketUuid();
+        String newUuid = UUID.randomUUID().toString();
+        ticket.setTicketUuid(newUuid); // Ustaw nowy UUID w encji
+
+        // Krok 2: Wygeneruj nowe dane dla kodu QR (JSON z nowym UUID)
+        QrCodePayloadDTO newQrPayload = QrCodePayloadDTO.builder()
+                .ticketUuid(newUuid)
+                .build();
+        String newQrCodeText;
+        try {
+            newQrCodeText = qrCodeGeneratorService.generateQrCodeText(newQrPayload);
+        } catch (RuntimeException e) {
+            LOG.error("Failed to generate NEW QR code text for ticket ID {} (New UUID: {}): {}",
+                    ticket.getId(), newUuid, e.getMessage(), e);
+            // Jeśli tu błąd, nie wysyłamy eventu o błędzie generacji, bo to błąd regeneracji.
+            // Rzucamy, aby transakcja się wycofała i ticketUuid nie został zmieniony.
+            throw new TicketGenerationException("Failed to generate new QR code text for ticket " + ticket.getId(), e);
+        }
+        ticket.setQrCodeData(newQrCodeText); // Ustaw nowe dane QR w encji
+
+        // Krok 3: (Opcjonalnie) Zresetuj validatedAt, jeśli regeneracja ma "odświeżyć" bilet
+        // ticket.setValidatedAt(null);
+        // ticket.setStatus(TicketStatus.VALID); // Upewnij się, że status jest VALID
+
+        // Krok 4: Zapisz zaktualizowaną encję Ticket
+        Ticket regeneratedTicket;
+        try {
+            regeneratedTicket = ticketRepository.save(ticket);
+            LOG.info("Ticket ID: {} successfully REGENERATED. Old UUID: {}, New UUID: {}. Reservation ID: {}",
+                    regeneratedTicket.getId(), oldUuid, newUuid, reservationId);
+        } catch (Exception e) {
+            LOG.error("Error saving regenerated ticket ID {} (New UUID: {}): {}", ticket.getId(), newUuid, e.getMessage(), e);
+            throw new TicketGenerationException("Failed to save regenerated ticket " + ticket.getId(), e);
+        }
+
+        // Krok 5: Wyślij event do NotificationService z danymi zregenerowanego biletu
+        TicketDTO ticketDTOForNotification = mapToTicketDTO(regeneratedTicket);
+        try {
+            producer.send(ticketDTOForNotification);
+            LOG.info("Regenerated ticket (ID: {}, New UUID: {}) for reservation ID: {} has been queued for sending to email: {}",
+                    regeneratedTicket.getId(), newUuid, reservationId, email);
+        } catch (Exception e) {
+            LOG.error("Failed to queue REGENERATED ticket (ID: {}, New UUID: {}) for sending. Reservation ID: {}. Error: {}",
+                    regeneratedTicket.getId(), newUuid, reservationId, e.getMessage(), e);
+            // Co jeśli wysyłka na Kafkę się nie powiedzie? Bilet jest zregenerowany w bazie, ale e-mail nie pójdzie.
+            // Rozważ wzorzec Outbox lub logikę kompensacyjną/alertowania.
+            // Na razie rzucamy, co wycofa zmianę UUID.
+            throw new TicketGenerationException("Failed to send regenerated ticket to notification queue for ticket ID " + regeneratedTicket.getId(), e);
+        }
+
+        // Krok 6: Wygeneruj obrazek QR na podstawie NOWYCH danych QR i zwróć go
+        return qrCodeGeneratorService.generateQrCodeImage(regeneratedTicket.getQrCodeData(), 300, 300);
+    }
+
+
     private TicketDTO mapToTicketDTO(Ticket ticket) {
         return TicketDTO.builder()
                 .id(ticket.getId())
+                .ticketUuid(ticket.getTicketUuid())
                 .reservationId(ticket.getReservationId())
                 .screeningId(ticket.getScreeningId())
                 .movieTitle(ticket.getMovieTitle())

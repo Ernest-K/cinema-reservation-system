@@ -22,6 +22,7 @@ public class TicketDTO {
     @NotNull(message = "Ticket ID cannot be null")
     @Positive(message = "Ticket ID must be positive")
     private Long id;
+    private String ticketUuid;
     private Long reservationId;
     private Long screeningId;
     private String movieTitle;

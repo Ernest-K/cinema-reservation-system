@@ -19,6 +19,7 @@
     <p>Thank you for your reservation! Here are your ticket details:</p>
 
     <div class="ticket-info">
+        <p><strong>Ticket ID (UUID):</strong> <span th:text="${ticketUuid}">TICKET-UUID</span></p>
         <p><strong>Movie:</strong> <span th:text="${movieTitle}">Movie Title</span></p>
         <p><strong>Screening Time:</strong> <span th:text="${#temporals.format(screeningTime, 'dd-MM-yyyy HH:mm')}">Date & Time</span></p>
         <p><strong>Hall:</strong> <span th:text="${hallInfo}">Hall</span></p>
