@@ -9,6 +9,7 @@ import com.example.ticket_service.repository.TicketRepository;
 import com.google.zxing.WriterException;
 import jakarta.ws.rs.NotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.example.commons.events.TicketValidatedEvent;
 import org.example.commons.exception.ResourceNotFoundException;
 import org.example.commons.exception.TicketAlreadyExistsException;
 import org.example.commons.exception.TicketGenerationException;
@@ -167,14 +168,30 @@ public class TicketService {
 
         ticket.setValidatedAt(LocalDateTime.now());
         ticket.setStatus(TicketStatus.USED);
+
+        Ticket validatedTicket;
         try {
-            Ticket validatedTicket = ticketRepository.save(ticket);
+            validatedTicket = ticketRepository.save(ticket);
             LOG.info("Ticket ID: {} successfully validated at {}.", validatedTicket.getId(), validatedTicket.getValidatedAt());
-            return mapToTicketDTO(validatedTicket);
         } catch (Exception e) {
             LOG.error("Error saving validated ticket ID {}: {}", ticketId, e.getMessage(), e);
             throw new TicketGenerationException("Failed to save validated ticket " + ticketId, e); // Używam ogólnego, można stworzyć bardziej specyficzny
         }
+
+        try {
+            TicketValidatedEvent event = TicketValidatedEvent.builder()
+                    .ticketId(validatedTicket.getId())
+                    .ticketUuid(validatedTicket.getTicketUuid())
+                    .reservationId(validatedTicket.getReservationId())
+                    .validatedAt(validatedTicket.getValidatedAt())
+                    .build();
+            producer.sendTicketValidatedEvent(event);
+            LOG.info("Published TicketValidatedEvent for ticket ID: {}", validatedTicket.getId());
+        } catch (Exception e) {
+            LOG.error("Failed to publish TicketValidatedEvent for ticket ID {}: {}", validatedTicket.getId(), e.getMessage(), e);
+        }
+
+        return mapToTicketDTO(validatedTicket);
     }
 
     @Transactional(readOnly = true)
@@ -329,10 +346,7 @@ public class TicketService {
         }
         if (ticket.getStatus() == TicketStatus.USED) {
             LOG.warn("Attempt to regenerate an already USED ticket for reservation ID: {}. This might be a security concern or require special handling.", reservationId);
-            // TODO: Decyzja biznesowa - czy pozwalać na regenerację użytego biletu?
-            // Jeśli tak, stary UUID nadal pozwolił na wejście. Nowy UUID może być mylący.
-            // Można rzucić wyjątek:
-            // throw new TicketValidationException("Ticket for reservation " + reservationId + " has already been USED and cannot be regenerated.");
+            throw new TicketGenerationException("Ticket for reservation " + reservationId + "is already USED and cannot be regenerated");
         }
 
         // Krok 1: Wygeneruj nowy UUID dla biletu

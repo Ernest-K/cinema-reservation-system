@@ -262,36 +262,41 @@ public class ReservationService {
             LOG.warn("Attempting to cancel a CONFIRMED reservation ID: {}. This might require a refund process.", reservationId);
         }
 
-        boolean ticketUsed = false;
-        if (reservation.getStatus() == ReservationStatus.CONFIRMED) {
-            try {
-                LOG.debug("Checking ticket status for reservation ID: {}", reservationId);
-                TicketDTO ticket = ticketServiceClient.getTicketByReservationId(reservationId);
-                if (ticket != null && ticket.getStatus() == TicketStatus.USED) {
-                    ticketUsed = true;
-                    LOG.info("Ticket for reservation ID {} was found and is USED.", reservationId);
-                } else if (ticket != null) {
-                    LOG.info("Ticket for reservation ID {} found with status: {}", reservationId, ticket.getStatus());
-                } else {
-                    LOG.warn("No ticket found by TicketService for confirmed reservation ID: {} during cancellation attempt. Proceeding with caution.", reservationId);
-                }
-            } catch (FeignException e) {
-                if (e.status() == 404) {
-                    LOG.warn("TicketService reported no ticket found (404) for reservation ID {} during cancellation.", reservationId);
-                } else {
-                    LOG.error("Error communicating with TicketService to check ticket status for reservation ID {}: {}. Status: {}",
-                            reservationId, e.getMessage(), e.status(), e);
-                }
-            } catch (Exception e) {
-                LOG.error("Unexpected error checking ticket status for reservation ID {}: {}", reservationId, e.getMessage(), e);
-                // throw new ServiceCommunicationException("Unexpected error checking ticket status.", e);
-            }
-        }
-
-        if (ticketUsed) {
-            LOG.error("Cannot cancel reservation ID: {} because its ticket has already been USED.", reservationId);
+        if (reservation.isTicketUsed()) {
+            LOG.error("Cannot cancel reservation ID: {} because its ticket has already been used (ticketUsed flag is true).", reservationId);
             throw new ReservationConflictException("Cannot cancel reservation: ticket has already been used.");
         }
+
+//        boolean ticketUsed = false;
+//        if (reservation.getStatus() == ReservationStatus.CONFIRMED) {
+//            try {
+//                LOG.debug("Checking ticket status for reservation ID: {}", reservationId);
+//                TicketDTO ticket = ticketServiceClient.getTicketByReservationId(reservationId);
+//                if (ticket != null && ticket.getStatus() == TicketStatus.USED) {
+//                    ticketUsed = true;
+//                    LOG.info("Ticket for reservation ID {} was found and is USED.", reservationId);
+//                } else if (ticket != null) {
+//                    LOG.info("Ticket for reservation ID {} found with status: {}", reservationId, ticket.getStatus());
+//                } else {
+//                    LOG.warn("No ticket found by TicketService for confirmed reservation ID: {} during cancellation attempt. Proceeding with caution.", reservationId);
+//                }
+//            } catch (FeignException e) {
+//                if (e.status() == 404) {
+//                    LOG.warn("TicketService reported no ticket found (404) for reservation ID {} during cancellation.", reservationId);
+//                } else {
+//                    LOG.error("Error communicating with TicketService to check ticket status for reservation ID {}: {}. Status: {}",
+//                            reservationId, e.getMessage(), e.status(), e);
+//                }
+//            } catch (Exception e) {
+//                LOG.error("Unexpected error checking ticket status for reservation ID {}: {}", reservationId, e.getMessage(), e);
+//                // throw new ServiceCommunicationException("Unexpected error checking ticket status.", e);
+//            }
+//        }
+//
+//        if (ticketUsed) {
+//            LOG.error("Cannot cancel reservation ID: {} because its ticket has already been USED.", reservationId);
+//            throw new ReservationConflictException("Cannot cancel reservation: ticket has already been used.");
+//        }
 
         reservation.getSeats().clear();
         reservation.setStatus(ReservationStatus.CANCELLED);
@@ -423,6 +428,8 @@ public class ReservationService {
                 reservation.getReservationTime(),
                 reservation.getStatus(),
                 reservation.getTotalAmount(),
+                reservation.isTicketUsed(),
+                reservation.getTicketUsedAt(),
                 seats
         );
     }

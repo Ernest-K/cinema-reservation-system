@@ -20,5 +20,7 @@ public class ReservationDTO {
     private LocalDateTime reservationTime;
     private ReservationStatus status;
     private BigDecimal totalAmount;
+    private boolean ticketUsed;
+    private LocalDateTime ticketUsedAt;
     private List<SeatDTO> seats;
 }

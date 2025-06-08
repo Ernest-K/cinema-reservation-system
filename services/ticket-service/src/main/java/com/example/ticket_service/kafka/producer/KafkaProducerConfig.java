@@ -4,6 +4,7 @@ import org.example.commons.dto.TicketDTO;
 import org.example.commons.events.TicketGenerationFailedEvent;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.apache.kafka.common.serialization.StringSerializer;
+import org.example.commons.events.TicketValidatedEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -47,5 +48,19 @@ public class KafkaProducerConfig {
     @Bean
     public KafkaTemplate<String, TicketGenerationFailedEvent> ticketFailedKafkaTemplate() {
         return new KafkaTemplate<>(ticketFailedProducerFactory());
+    }
+
+    @Bean
+    public ProducerFactory<String, TicketValidatedEvent> ticketValidatedProducerFactory() {
+        Map<String, Object> configProps = new HashMap<>();
+        configProps.put(ProducerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        configProps.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+        configProps.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, JsonSerializer.class);
+        return new DefaultKafkaProducerFactory<>(configProps);
+    }
+
+    @Bean
+    public KafkaTemplate<String, TicketValidatedEvent> ticketValidatedKafkaTemplate() {
+        return new KafkaTemplate<>(ticketValidatedProducerFactory());
     }
 }

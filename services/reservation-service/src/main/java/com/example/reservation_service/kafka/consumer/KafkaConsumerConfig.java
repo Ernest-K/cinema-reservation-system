@@ -98,7 +98,6 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, ScreeningCreatedEvent> screeningCreatedEventKafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, ScreeningCreatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(screeningCreatedEventConsumerFactory());
-        // TODO: Rozważ dodanie ErrorHandler i DLT
         return factory;
     }
 
@@ -118,11 +117,9 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> screeningUpdatedEventKafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, ScreeningUpdatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(screeningUpdatedEventConsumerFactory());
-        // TODO: Rozważ dodanie ErrorHandler i DLT
         return factory;
     }
 
-    // Dla ScreeningCancelledEvent
     @Bean
     public ConsumerFactory<String, ScreeningCancelledEvent> screeningCancelledEventConsumerFactory() {
         Map<String, Object> props = new HashMap<>();
@@ -138,7 +135,24 @@ public class KafkaConsumerConfig {
     public ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> screeningCancelledEventKafkaListenerContainerFactory() {
         ConcurrentKafkaListenerContainerFactory<String, ScreeningCancelledEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(screeningCancelledEventConsumerFactory());
-        // TODO: Rozważ dodanie ErrorHandler i DLT
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, TicketValidatedEvent> ticektValidatedEventConsumerFactory() {
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "cinema-group-reservation");
+        props.put(JsonDeserializer.TRUSTED_PACKAGES, "org.example.commons.*");
+        props.put(JsonDeserializer.VALUE_DEFAULT_TYPE, "org.example.commons.events.TicketValidatedEvent");
+        props.put(JsonDeserializer.USE_TYPE_INFO_HEADERS, false);
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), new JsonDeserializer<>(TicketValidatedEvent.class, false));
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, TicketValidatedEvent> ticketValidatedEventKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, TicketValidatedEvent> factory = new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(ticektValidatedEventConsumerFactory());
         return factory;
     }
 }

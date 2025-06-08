@@ -98,12 +98,11 @@ public class TicketController {
 //        return ResponseEntity.ok("Ticket has been resent to email: " + email);
 //    }
 
-    @PostMapping(value = "/regenerate", produces = MediaType.IMAGE_PNG_VALUE) // Nowa lub zmieniona ścieżka
+    @PostMapping(value = "/regenerate", produces = MediaType.IMAGE_PNG_VALUE)
     public ResponseEntity<byte[]> regenerateTicketAndGetQr(
             @RequestParam("email") @NotBlank @Email(message = "Valid email is required.") String email,
             @RequestParam("reservationId") @NotNull @Positive(message = "Reservation ID must be positive.") Long reservationId
     ) throws IOException, WriterException {
-        // GlobalExceptionHandler obsłuży wyjątki
         byte[] qrImageBytes = ticketService.regenerateTicketAndGetQr(email, reservationId);
 
         HttpHeaders headers = new HttpHeaders();
@@ -123,8 +122,8 @@ public class TicketController {
     }
 
     @GetMapping("/uuid/{ticketUuid}")
-    public TicketDTO getTicketByTicketUuid(@PathVariable String ticketUuid) {
-        return ticketService.getTicketByUuid(ticketUuid); // Musisz dodać metodę getTicketByUuid do TicketService
+    public TicketDTO getTicketByTicketUuid(@PathVariable("ticketUuid") String ticketUuid) {
+        return ticketService.getTicketByUuid(ticketUuid);
     }
 
 }
