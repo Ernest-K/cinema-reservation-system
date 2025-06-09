@@ -150,6 +150,105 @@
 						}
 					},
 					"response": []
+				},
+				{
+					"name": "Create screening",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"startTime\": \"2025-06-10T18:30:00\",\r\n    \"basePrice\": 25.99,\r\n    \"movieDTO\": {\r\n        \"id\": 1\r\n    },\r\n    \"hallDTO\": {\r\n        \"id\": 2\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/screenings",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"screenings"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get screening",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/screenings/5",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"screenings",
+								"5"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Update screening",
+					"request": {
+						"method": "PUT",
+						"header": [],
+						"body": {
+							"mode": "raw",
+							"raw": "{\r\n    \"id\": 1,\r\n    \"startTime\": \"2025-06-10T20:00:00\",\r\n    \"basePrice\": 28.00,\r\n    \"movieDTO\": {\r\n        \"id\": 1\r\n    },\r\n    \"hallDTO\": {\r\n        \"id\": 2\r\n    }\r\n}",
+							"options": {
+								"raw": {
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "http://localhost:8080/api/screenings/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"screenings",
+								"1"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Delete screening",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:8080/api/screenings/1",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "8080",
+							"path": [
+								"api",
+								"screenings",
+								"1"
+							]
+						}
+					},
+					"response": []
 				}
 			],
 			"description": "Endpoints for Movie and Screening information"
@@ -195,7 +294,7 @@
 						],
 						"body": {
 							"mode": "raw",
-							"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [6] \n}",
+							"raw": "{\n    \"movieId\": {{movieIdForReservation}}, \n    \"screeningId\": {{screeningId}}, \n    \"customerName\": \"Test Customer\",\n    \"customerEmail\": \"ernio789@gmail.com\",\n    \"seatIds\": [1] \n}",
 							"options": {
 								"raw": {
 									"language": "json"
@@ -396,7 +495,27 @@
 					"response": []
 				},
 				{
-					"name": "Get Ticket QR Code Image",
+					"name": "Get Ticket by Ticket UUID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/uuid/8bf2ab17-cd4a-4f31-a2d1-e097586aa2de",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"uuid",
+								"8bf2ab17-cd4a-4f31-a2d1-e097586aa2de"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket QR Code by Ticket ID",
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -430,6 +549,89 @@
 								"tickets",
 								"{{ticketId}}",
 								"validate"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Regenerate",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/regenerate?email=ernio789%40gmail.com&reservationId=1",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"regenerate"
+							],
+							"query": [
+								{
+									"key": "email",
+									"value": "ernio789%40gmail.com"
+								},
+								{
+									"key": "reservationId",
+									"value": "1"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Resend by email",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/resend-by-email?email=ernio789%40gmail.com",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"resend-by-email"
+							],
+							"query": [
+								{
+									"key": "email",
+									"value": "ernio789%40gmail.com"
+								}
+							]
+						}
+					},
+					"response": []
+				},
+				{
+					"name": "Get Ticket QR Code by email and Reservation ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/tickets/qr-code?email=ernio789%40gmail.com&reservationId",
+							"host": [
+								"{{baseUrl}}"
+							],
+							"path": [
+								"api",
+								"tickets",
+								"qr-code"
+							],
+							"query": [
+								{
+									"key": "email",
+									"value": "ernio789%40gmail.com"
+								},
+								{
+									"key": "reservationId",
+									"value": null
+								}
 							]
 						}
 					},

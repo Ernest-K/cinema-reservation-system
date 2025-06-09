@@ -52,7 +52,6 @@ public class DataInitializer {
         if (screeningRepository.count() == 0) {
             screenings = List.of(
                     new Screening(LocalDateTime.now(), new BigDecimal("20.00"), movies.get(0), halls.get(0)),
-                    new Screening(LocalDateTime.now().plus(3, ChronoUnit.HOURS), new BigDecimal("22.00"), movies.get(0), halls.get(0)),
                     new Screening(LocalDateTime.now(), new BigDecimal("30.00"), movies.get(1), halls.get(1)),
                     new Screening(LocalDateTime.now(), new BigDecimal("25.00"), movies.get(2), halls.get(2))
             );

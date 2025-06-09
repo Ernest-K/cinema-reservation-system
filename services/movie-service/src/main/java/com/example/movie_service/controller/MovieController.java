@@ -60,6 +60,6 @@ public class MovieController {
             @RequestParam("ids")
             @NotEmpty(message = "Seat IDs list cannot be empty.")
             List<Long> seatIds) {
-        return screeningService.getSeatsById(seatIds);
+        return screeningService.getSeatsByIds(seatIds);
     }
 }

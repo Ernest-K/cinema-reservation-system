@@ -5,10 +5,12 @@ import com.example.reservation_service.client.TicketServiceClient;
 import com.example.reservation_service.entity.Reservation;
 import com.example.reservation_service.entity.ReservedSeat;
 import com.example.reservation_service.entity.ScreeningInfo;
+import com.example.reservation_service.entity.ScreeningSeatInfo;
 import com.example.reservation_service.kafka.producer.MessageProducer;
 import com.example.reservation_service.repository.ReservationRepository;
 import com.example.reservation_service.repository.ReservedSeatRepository;
 import com.example.reservation_service.repository.ScreeningInfoRepository;
+import com.example.reservation_service.repository.ScreeningSeatInfoRepository;
 import feign.FeignException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -41,6 +44,7 @@ public class ReservationService {
     private static final Logger LOG = LoggerFactory.getLogger(ReservationService.class);
     private final ReservationRepository reservationRepository;
     private final ScreeningInfoRepository screeningInfoRepository;
+    private final ScreeningSeatInfoRepository screeningSeatInfoRepository;
     private final ReservedSeatRepository reservedSeatRepository;
     private final MovieServiceClient movieServiceClient;
     private final TicketServiceClient ticketServiceClient;
@@ -63,96 +67,123 @@ public class ReservationService {
 
     @Transactional
     public ReservationDTO createReservation(CreateReservationDTO request) {
-        LOG.info("Attempting to create reservation for screening ID: {} by customer: {}", request.getScreeningId(), request.getCustomerEmail());
+        LOG.info("Attempting to create reservation for screening (info) ID: {} by customer: {}", request.getScreeningId(), request.getCustomerEmail());
 
-        ScreeningDTO screening;
-        List<SeatDTO> seats;
+        ScreeningInfo screeningInfo = screeningInfoRepository.findById(request.getScreeningId()) // Użyj poprawnej nazwy
+                .filter(ScreeningInfo::isActive)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Active screening with ID " + request.getScreeningId() + " not found or is inactive."));
 
-        try {
-            LOG.debug("Fetching screening details for ID: {}", request.getScreeningId());
-            screening = movieServiceClient.getScreeningById(request.getScreeningId());
-            if (screening == null) { // Dodatkowe zabezpieczenie, Feign powinien rzucić wyjątek przy 404
-                throw new ResourceNotFoundException("Screening with ID " + request.getScreeningId() + " not found via movie-service.");
-            }
-            LOG.debug("Fetching seat details for IDs: {}", request.getSeatIds());
-            seats = movieServiceClient.getSeatsById(request.getSeatIds());
-            if (seats == null || seats.size() != request.getSeatIds().size()) {
-                throw new ResourceNotFoundException("Could not find all requested seats via movie-service. Requested: " + request.getSeatIds().size() + ", Found: " + (seats != null ? seats.size() : 0));
-            }
-        } catch (FeignException e) {
-            LOG.error("Error communicating with movie-service while creating reservation. Status: {}, URL: {}, Message: {}",
-                    e.status(), e.request() != null ? e.request().url() : "N/A", e.contentUTF8(), e);
-            throw new ServiceCommunicationException("Failed to retrieve screening or seat details from movie-service.", e);
-        } catch (Exception e) {
-            LOG.error("Unexpected error communicating with movie-service: {}", e.getMessage(), e);
-            throw new ServiceCommunicationException("Unexpected error communicating with movie-service.", e);
+        // Pobierz kopie miejsc dla tego seansu, które odpowiadają żądanym originalSeatId
+        List<ScreeningSeatInfo> requestedSeatInfos = screeningSeatInfoRepository // Użyj poprawnej nazwy
+                .findAllByScreeningInfoIdAndOriginalSeatIdIn(screeningInfo.getId(), request.getSeatIds()); // Użyj poprawnej nazwy
+
+        if (requestedSeatInfos.size() != request.getSeatIds().size()) {
+            List<Long> foundOriginalSeatIds = requestedSeatInfos.stream().map(ScreeningSeatInfo::getOriginalSeatId).collect(Collectors.toList()); // Użyj poprawnej nazwy
+            List<Long> missingSeatIds = request.getSeatIds().stream().filter(id -> !foundOriginalSeatIds.contains(id)).collect(Collectors.toList());
+            LOG.warn("Could not find all requested seat infos for screening {}. Missing originalSeatIds: {}", screeningInfo.getId(), missingSeatIds);
+            throw new ResourceNotFoundException("Some requested seats do not exist for this screening. Missing original seat IDs: " + missingSeatIds);
         }
 
-        List<SeatAvailabilityDTO> availabilityList = checkSeatsAvailability(request.getScreeningId(), request.getSeatIds());
-        List<SeatAvailabilityDTO> unavailableSeats = availabilityList.stream().filter(s -> !s.isAvailable()).collect(Collectors.toList());
-
-        if (!unavailableSeats.isEmpty()) {
-            String unavailableSeatIds = unavailableSeats.stream()
-                    .map(s -> s.getSeatId().toString())
-                    .collect(Collectors.joining(", "));
-            LOG.warn("Attempt to reserve unavailable seats. Screening ID: {}, Unavailable Seat IDs: {}", request.getScreeningId(), unavailableSeatIds);
-            throw new ReservationConflictException("Selected seats are not available. Unavailable seat IDs: " + unavailableSeatIds);
+        for (Long requestedOriginalSeatId : request.getSeatIds()) {
+            if (reservedSeatRepository.existsBySeatIdAndReservation_ScreeningIdAndReservation_StatusNot(
+                    requestedOriginalSeatId,
+                    screeningInfo.getId(),
+                    ReservationStatus.CANCELLED
+                    // Rozważ dodanie ReservationStatus.EXPIRED, jeśli wygasłe rezerwacje zwalniają miejsca
+            )) {
+                LOG.warn("Seat (original ID: {}) for screening ID: {} is already reserved in an active reservation.", requestedOriginalSeatId, screeningInfo.getId());
+                throw new ReservationConflictException("Seat (original ID: " + requestedOriginalSeatId + ") is already reserved.");
+            }
         }
 
         Reservation reservation = new Reservation();
-        reservation.setScreeningId(request.getScreeningId());
+        reservation.setScreeningId(screeningInfo.getId());
         reservation.setCustomerName(request.getCustomerName());
         reservation.setCustomerEmail(request.getCustomerEmail());
         reservation.setReservationTime(LocalDateTime.now());
         reservation.setStatus(ReservationStatus.PENDING_PAYMENT);
-
-        BigDecimal pricePerSeat = screening.getBasePrice();
-        if (pricePerSeat == null || pricePerSeat.compareTo(BigDecimal.ZERO) <= 0) {
-            LOG.error("Invalid base price ({}) for screening ID: {}", pricePerSeat, screening.getId());
-            throw new IllegalStateException("Screening base price is invalid.");
-        }
+        BigDecimal pricePerSeat = screeningInfo.getBasePrice();
         reservation.setTotalAmount(pricePerSeat.multiply(new BigDecimal(request.getSeatIds().size())));
 
-        for (SeatDTO seatDTO : seats) {
-            ReservedSeat seat = ReservedSeat.builder()
-                    .seatId(seatDTO.getId())
-                    .rowNumber(seatDTO.getRowNumber())
-                    .seatNumber(seatDTO.getSeatNumber())
+        List<SeatDTO> seatDTOsForEvent = new ArrayList<>();
+        for (ScreeningSeatInfo seatInfo : requestedSeatInfos) { // Użyj poprawnej nazwy
+            ReservedSeat reservedSeatEntity = ReservedSeat.builder()
+                    .seatId(seatInfo.getOriginalSeatId())
+                    .rowNumber(seatInfo.getRowNumber())
+                    .seatNumber(seatInfo.getSeatNumber())
                     .reservation(reservation)
                     .build();
-            reservation.getSeats().add(seat);
+            reservation.getSeats().add(reservedSeatEntity);
+            seatDTOsForEvent.add(new SeatDTO(seatInfo.getOriginalSeatId(), seatInfo.getRowNumber(), seatInfo.getSeatNumber()));
         }
 
         Reservation savedReservation = reservationRepository.save(reservation);
         LOG.info("Reservation created successfully with ID: {}", savedReservation.getId());
 
-        ReservationDTO event = mapToReservationDTO(savedReservation, screening, seats);
-        messageProducer.sendReservation(event);
-        return event;
+        ScreeningDTO screeningForEvent = mapScreeningInfoForEvent(screeningInfo); // Użyj poprawnej nazwy
+        ReservationDTO eventPayload = mapToReservationDTO(savedReservation, screeningForEvent, seatDTOsForEvent);
+        messageProducer.sendReservation(eventPayload);
+
+        return eventPayload;
+    }
+
+    private ScreeningDTO mapScreeningInfoForEvent(ScreeningInfo screeningInfo) {
+        if (screeningInfo == null) {
+            LOG.warn("Attempted to map a null ScreeningInfo to ScreeningDTO.");
+            return null; // Lub rzuć wyjątek
+        }
+
+        MovieDTO movieDTO = new MovieDTO(screeningInfo.getMovieId(), screeningInfo.getMovieTitle());
+        HallDTO hallDTO = new HallDTO(screeningInfo.getHallId(), screeningInfo.getHallNumber(), 0, 0);
+        List<ScreeningSeatInfo> seatInfos = screeningSeatInfoRepository.findAllByScreeningInfoId(screeningInfo.getId());
+
+        List<SeatDTO> seatDTOs = seatInfos.stream()
+                .map(seatInfo -> new SeatDTO(
+                        seatInfo.getOriginalSeatId(), // Używamy originalSeatId
+                        seatInfo.getRowNumber(),
+                        seatInfo.getSeatNumber()
+                ))
+                .collect(Collectors.toList());
+
+        return new ScreeningDTO(
+                screeningInfo.getId(),
+                screeningInfo.getStartTime(),
+                screeningInfo.getBasePrice(),
+                movieDTO,
+                hallDTO,
+                null // Przekazujemy zmapowaną listę miejsc
+        );
     }
 
     public ReservationDTO getReservation(Long reservationId) {
-        LOG.debug("Fetching reservation with ID: {}", reservationId);
         Reservation reservation = reservationRepository.findById(reservationId)
                 .orElseThrow(() -> new ResourceNotFoundException("Reservation with ID " + reservationId + " not found."));
 
-        ScreeningDTO screening;
-        List<SeatDTO> seats;
-        try {
-            screening = movieServiceClient.getScreeningById(reservation.getScreeningId());
-            List<Long> seatIds = reservation.getSeats().stream().map(ReservedSeat::getSeatId).collect(Collectors.toList());
-            if (!seatIds.isEmpty()) {
-                seats = movieServiceClient.getSeatsById(seatIds);
-            } else {
-                seats = Collections.emptyList();
-            }
+        ScreeningInfo screeningInfo = screeningInfoRepository.findById(reservation.getScreeningId()) // Użyj poprawnej nazwy
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Screening info (copy) for ID " + reservation.getScreeningId() + " not found."));
 
-        } catch (FeignException e) {
-            LOG.error("Error communicating with movie-service while fetching details for reservation ID: {}. Error: {}", reservationId, e.getMessage(), e);
-            throw new ServiceCommunicationException("Failed to retrieve screening or seat details from movie-service for reservation " + reservationId, e);
-        }
+        ScreeningDTO screeningForResponse = mapScreeningInfoForEvent(screeningInfo); // Użyj poprawnej nazwy
 
-        return mapToReservationDTO(reservation, screening, seats);
+        List<SeatDTO> seats = reservation.getSeats().stream()
+                .map(reservedSeat -> {
+                    ScreeningSeatInfo seatInfo = screeningSeatInfoRepository // Użyj poprawnej nazwy
+                            .findByScreeningInfoIdAndOriginalSeatId(screeningInfo.getId(), reservedSeat.getSeatId()) // Użyj poprawnej nazwy
+                            .orElseGet(() -> {
+                                LOG.warn("ScreeningSeatInfo not found for screening {} and originalSeatId {}. Using data from ReservedSeat.",
+                                        screeningInfo.getId(), reservedSeat.getSeatId());
+                                return ScreeningSeatInfo.builder() // Użyj poprawnej nazwy
+                                        .originalSeatId(reservedSeat.getSeatId())
+                                        .rowNumber(reservedSeat.getRowNumber())
+                                        .seatNumber(reservedSeat.getSeatNumber())
+                                        .build();
+                            });
+                    return new SeatDTO(seatInfo.getOriginalSeatId(), seatInfo.getRowNumber(), seatInfo.getSeatNumber());
+                })
+                .collect(Collectors.toList());
+
+        return mapToReservationDTO(reservation, screeningForResponse, seats);
     }
 
     @Transactional
@@ -436,22 +467,21 @@ public class ReservationService {
 
     public void ticketGenerationRequest(Reservation reservation) {
         LOG.info("Preparing ticket generation request for confirmed reservation ID: {}", reservation.getId());
-        ScreeningDTO screening;
-        List<SeatDTO> seats;
-        try {
-            screening = movieServiceClient.getScreeningById(reservation.getScreeningId());
-            List<Long> seatIds = reservation.getSeats().stream().map(ReservedSeat::getSeatId).collect(Collectors.toList());
-            if (!seatIds.isEmpty()) {
-                seats = movieServiceClient.getSeatsById(seatIds);
-            } else {
-                seats = Collections.emptyList();
-            }
-        } catch (FeignException e) {
-            LOG.error("Failed to fetch screening/seat details for ticket generation (Reservation ID: {}). Error: {}", reservation.getId(), e.getMessage(), e);
-            throw new ServiceCommunicationException("Failed to prepare ticket request due to movie-service communication error.", e);
-        }
+        ScreeningInfo screeningCopy = screeningInfoRepository.findById(reservation.getScreeningId())
+                .orElseThrow(() -> {
+                    LOG.error("CRITICAL: ScreeningCopy not found for confirmed reservation ID {} during ticket generation prep. Data inconsistency.", reservation.getId());
+                    // Ten błąd powinien być obsłużony bardzo poważnie, np. alert dla admina
+                    // Wysyłamy TicketGenerationFailedEvent, aby uruchomić kompensację
+                    return new ResourceNotFoundException("ScreeningCopy not found for reservation " + reservation.getId());
+                });
 
-        ReservationDTO reservationDTO = mapToReservationDTO(reservation, screening, seats);
+        ScreeningDTO screeningForEvent = mapScreeningInfoForEvent(screeningCopy);
+
+        List<SeatDTO> seatsForEvent = reservation.getSeats().stream()
+                .map(reservedSeat -> new SeatDTO(reservedSeat.getSeatId(), reservedSeat.getRowNumber(), reservedSeat.getSeatNumber()))
+                .collect(Collectors.toList());
+
+        ReservationDTO reservationDTO = mapToReservationDTO(reservation, screeningForEvent, seatsForEvent);
         messageProducer.sendTicketRequest(reservationDTO);
         LOG.info("Ticket generation request sent for reservation ID: {}", reservation.getId());
     }

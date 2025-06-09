@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @NoArgsConstructor
@@ -17,4 +18,5 @@ public class ScreeningDTO {
     private BigDecimal basePrice;
     private MovieDTO movieDTO;
     private HallDTO hallDTO;
+    private List<SeatDTO> availableSeats;
 }

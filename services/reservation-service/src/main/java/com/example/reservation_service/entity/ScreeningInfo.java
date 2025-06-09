@@ -40,6 +40,12 @@ public class ScreeningInfo {
     @Column(nullable = false)
     private int hallNumber;
 
+    @Column(nullable = false)
+    private int hallRows;
+
+    @Column(nullable = false)
+    private int hallSeatsPerRow;
+
     private boolean isActive = true;
 
     public ScreeningInfo(Long id, LocalDateTime startTime, BigDecimal basePrice, Long movieId, String movieTitle, Long hallId, int hallNumber) {
@@ -61,5 +67,18 @@ public class ScreeningInfo {
         this.hallId = screeningInfo.hallId;
         this.hallNumber = screeningInfo.hallNumber;
         this.isActive = screeningInfo.isActive;
+    }
+
+    public ScreeningInfo(Long id, LocalDateTime startTime, BigDecimal basePrice, Long movieId, String movieTitle, Long hallId, int hallNumber, int hallRows, int hallSeatsPerRow) {
+        this.id = id;
+        this.startTime = startTime;
+        this.basePrice = basePrice;
+        this.movieId = movieId;
+        this.movieTitle = movieTitle;
+        this.hallId = hallId;
+        this.hallNumber = hallNumber;
+        this.isActive = true; // Domyślnie aktywne
+        this.hallRows = hallRows;
+        this.hallSeatsPerRow = hallSeatsPerRow;
     }
 }
